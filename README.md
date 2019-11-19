@@ -1,8 +1,9 @@
 # das2D 
-Initial dlang das2 client module
+Initial [D language](https://dlang.org/) das2 client module
 
-This module is not ready for prime time having no dub integration or other primary
-dlang ecosystem features.  It is however used in production code at U. Iowa in 
-support of the Cassini mission and the Long Wave Array (LWA-1) radio astronomy
-station.
+This module is not ready for prime time having no [dub](https://code.dlang.org/)
+integration or other primary dlang ecosystem features.  It is however used in
+production code at U. Iowa in support of the Cassini mission and the Long Wave
+Array (LWA-1) radio astronomy station.
+
 
