@@ -4,6 +4,10 @@ import std.string;
 import std.datetime;
 import core.time;
 import std.math;
+import core.stdc.string;
+public import std.conv: ConvException;
+
+import das2.units;
 
 
 // Das Times
@@ -12,7 +16,7 @@ extern(C) int parsetime (
 	int *hour, int *minute, double *second
 );
 
-struct das_time_t{
+struct das_time{
 	int year;
 	int month;
 	int mday;
@@ -22,17 +26,17 @@ struct das_time_t{
 	double second;
 };
 
-extern (C) void dt_null(das_time_t* pDt);
-extern (C) bool dt_parsetime(const char* string, das_time_t* dt);
-extern (C) void dt_copy(das_time_t* pDest, const das_time_t* pSrc);
-extern (C) int dt_compare(const das_time_t* pA, const das_time_t* pB);
-extern (C) double dt_diff(const das_time_t* pA, const das_time_t* pB);
-extern (C) char* dt_isoc(char* sBuf, size_t nLen, const das_time_t* pDt, int nFracSec);
-extern (C) char* dt_isod(char* sBuf, size_t nLen, const das_time_t* pDt, int nFracSec);
-extern (C) char* dt_dual_str(char* sBuf, size_t nLen, const das_time_t* pDt, int nFracSec);
-extern (C) double dt_ttime(const das_time_t* dt);
-extern (C) void dt_emitt (double tt, das_time_t* dt);
-extern (C) void dt_tnorm(das_time_t* dt);  // Extra reminder, dt.yday is OUTPUT only !
+extern (C) void dt_null(das_time* pDt);
+extern (C) bool dt_parsetime(const char* string, das_time* dt);
+extern (C) void dt_copy(das_time* pDest, const das_time* pSrc);
+extern (C) int dt_compare(const das_time* pA, const das_time* pB);
+extern (C) double dt_diff(const das_time* pA, const das_time* pB);
+extern (C) char* dt_isoc(char* sBuf, size_t nLen, const das_time* pDt, int nFracSec);
+extern (C) char* dt_isod(char* sBuf, size_t nLen, const das_time* pDt, int nFracSec);
+extern (C) char* dt_dual_str(char* sBuf, size_t nLen, const das_time* pDt, int nFracSec);
+extern (C) double dt_ttime(const das_time* dt);
+extern (C) void dt_emitt (double tt, das_time* dt);
+extern (C) void dt_tnorm(das_time* dt);  // Extra reminder, dt.yday is OUTPUT only !
 
 
 /**************************************************************************
@@ -126,3 +130,152 @@ string rpwgString(SysTime st, int nSecPrec = 0){
 	}
 	return sOut;
 }
+
+/*****************************************************************************
+ * Time handling class that drops time zone complexity and sub-second 
+ *  integer units.  Has conversions to epoch times.
+ *
+ * You should probably use SysTime instead if possible
+ */
+struct DasTime{
+	int year = 1; 
+	int month = 1; 
+	int mday = 1; 
+	int yday = 1;   // Typically read only except for normDoy()
+	int hour = 0;   // redundant, but explicit beats implicit
+	int minute = 0; // default value for ints is 0 
+	double second = 0.0;
+
+	double fEpoch = double.nan;   // Save the epoch value if it has been 
+	                             // computed
+	UnitType ut = null;
+
+	/** Construct a time value using a string */
+	this(const(char)[] s){
+		int nRet;
+		//infof("Parsting time string: %s", s);
+		nRet = parsetime(s.toStringz(),&year,&month,&mday,&yday,&hour,&minute,&second);
+		if(nRet != 0)
+			throw new ConvException(format("Error parsing %s as a date-time", s));
+	}
+	
+	this(ref das_time dt){
+		year = dt.year;
+		month = dt.month;
+		mday = dt.mday;
+		yday = dt.yday;
+		hour = dt.hour;
+		minute = dt.minute;
+		second = dt.second;
+	}
+
+	void setFromDt(das_time* pDt){
+		year = pDt.year;
+		month = pDt.month;
+		mday = pDt.mday;
+		yday = pDt.yday;
+		hour = pDt.hour;
+		minute = pDt.minute;
+		second = pDt.second;
+	}
+
+	das_time toDt() const{
+		das_time dt;
+		dt.year = year;
+		dt.month = month;
+		dt.mday = mday;
+		dt.yday = yday;
+		dt.hour = hour;
+		dt.minute = minute;
+		dt.second = second;
+		return dt;
+	}
+
+	this(double value, UnitType units){
+		das_time dt;
+		if(! Units_haveCalRep(units)) 
+			throw new ConvException(
+				format("Unit type %s not convertable to a date-time", Units_toStr(units))
+			);
+		Units_convertToDt(&dt, value, units);
+		setFromDt(&dt);
+		ut = units;
+		fEpoch = value;
+	}
+
+	/** Create a time using a vairable length tuple.
+	 * 
+	 * Up to 6 arguments will be recognized, at least one must be given
+	 * year, month, day, hour, minute, seconds
+	 * All items not initialized will recive default values which are
+	 *  year = 1, month = 1, day = 1, hour = 0, minute = 0, seconds = 0.0
+	 *
+	 */
+	
+	this(T...)(T args){
+		static assert(args.length > 0);
+		year = args[0];
+		static if(args.length > 1) month = args[1];
+		static if(args.length > 2) mday = args[2];
+		static if(args.length > 3) hour = args[3];
+		static if(args.length > 4) minute = args[4];
+		static if(args.length > 5) second = args[5];
+	}
+
+	double epoch(UnitType units){
+		if(ut != units){
+			if(! Units_haveCalRep(units)) 
+			throw new ConvException(
+				format("Unit type %s not convertable to a date-time", Units_toStr(units))
+			);
+			ut = units;
+			das_time dt = toDt();
+			fEpoch = Units_convertFromDt(units, &dt);
+		}
+		return fEpoch;
+	}
+
+	string toIsoC(int fracdigits) const{
+		char[64] aBuf = '\0';
+		das_time dt = toDt();
+		dt_isoc(aBuf.ptr, 63, &dt, fracdigits);
+		return aBuf.idup[0..strlen(aBuf.ptr)];
+	}
+
+  
+	string toString() const{ return toIsoC(6); }
+  
+
+  void norm(){
+    das_time dt = toDt(); 
+    dt_tnorm(&dt);
+    setFromDt(&dt);
+	 if(ut !is null){
+		 fEpoch = Units_convertFromDt(ut, &dt);
+	 }
+  }
+
+	string toIsoD(int fracdigits) const{
+		char[64] aBuf = '\0';
+		das_time dt = toDt();
+		dt_isod(aBuf.ptr, 63, &dt, fracdigits);
+		return aBuf.idup[0..strlen(aBuf.ptr)];
+	}
+
+	string toDual(int fracdigits) const{
+		char[64] aBuf = '\0';
+		das_time dt = toDt();
+		dt_dual_str(aBuf.ptr, 63, &dt, fracdigits);
+		return aBuf.idup[0..strlen(aBuf.ptr)];
+	}
+
+	int opCmp(in DasTime other) const {
+		if(year < other.year) return -1; if(year > other.year) return 1;
+		if(month < other.month) return -1; if(month > other.month) return 1;
+		if(mday < other.mday) return -1; if(mday > other.mday) return 1;
+		if(hour < other.hour) return -1; if(hour > other.hour) return 1;
+		if(minute < other.minute) return -1; if(minute > other.minute) return 1;
+		if(second < other.second) return -1; if(second > other.second) return 1;
+		return 0;
+	}
+};

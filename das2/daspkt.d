@@ -86,7 +86,7 @@ public:
 
 	void add(immutable(ubyte)[] uBytes){
 		ulong u = m_aData.length;
-		foreach(int i, ubyte b; uBytes) m_aData[u][i] = b;
+		foreach(size_t v, ubyte b; uBytes) m_aData[u][v] = b;
 	}
 
 	void addf(T...)(T args) {

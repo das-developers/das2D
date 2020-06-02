@@ -1,4 +1,4 @@
-module das2.cordata;
+module das2.dataset;
 
 import std.stdio, std.string, std.conv;
 import das2.util, das2.log, das2.builder;
@@ -10,37 +10,37 @@ enum element_type {
 
 /** Object for holding a correlated set of datum generators and any backing
  * array storage */
-struct cordata;
-alias Cds = cordata;
+struct dataset;
+alias DasDs = dataset;
 
-private extern (C) int Cds_rank(Cds* pThis);
+private extern (C) int DasDs_rank(DasDs* pThis);
 
-private extern (C) void del_Cds(Cds* pThis);
+private extern (C) void del_DasDs(DasDs* pThis);
 
-private extern (C) size_t Cds_shape(Cds* pThis, int* outAry);
+private extern (C) size_t DasDs_shape(DasDs* pThis, int* outAry);
 
-private extern (C) size_t Cds_shapeOf(
-	Cds* pThis, const char* sSetName, size_t* outAry
+private extern (C) size_t DasDs_shapeOf(
+	DasDs* pThis, const char* sSetName, size_t* outAry
 );
 
 /** Get the dataset ids */
-private extern (C) size_t Cds_datasetIds(Cds* pThis, const char** pOutAry);
+private extern (C) size_t DasDs_datasetIds(DasDs* pThis, const char** pOutAry);
 
-private extern (C) size_t Cds_coordIds(Cds* pThis, const char** pOutAry);
+private extern (C) size_t DasDs_coordIds(DasDs* pThis, const char** pOutAry);
 
-private extern (C) size_t Cds_coordsOf(Cds* pThis, const char* dataset, const char** pOutAry);
+private extern (C) size_t DasDs_coordsOf(DasDs* pThis, const char* dataset, const char** pOutAry);
 
-private extern (C) bool Cds_orthogonal(Cds* pThis, const char* datasetA, const char* datasetB);
+private extern (C) bool DasDs_orthogonal(DasDs* pThis, const char* datasetA, const char* datasetB);
 
-private extern (C) void* Cds_slice1D( 
-	const Cds* pThis, const char* sDs, const char* sCoord, int iCoordIdx, int*pCoeff
+private extern (C) void* DasDs_slice1D( 
+	const DasDs* pThis, const char* sDs, const char* sCoord, int iCoordIdx, int*pCoeff
 );
   
-private extern (C) void Cds_releaseArrays(Cds* pThis);
+private extern (C) void DasDs_releaseArrays(DasDs* pThis);
 
-private extern (C) void Cds_write(Cds* pThis);
+private extern (C) void DasDs_write(DasDs* pThis);
 
-/** A CdsRange is a Random Access Range returned by Cds.slice().
+/** A DsRange is a Random Access Range returned by Cds.slice().
  * 		It can be treated just like a traditional D slice.
  *
  *  CdsRanges are slices of a Cds that may not be a contiguous 
@@ -48,7 +48,7 @@ private extern (C) void Cds_write(Cds* pThis);
  *  stride and offset that are used in the necessary Random 
  *  Access Range functions. 
 */
-struct CdsRange(T){
+struct DsRange(T){
 	
 	this(int[3] inSliceCoef, void* inDataBegin){
 		sliceCoef = inSliceCoef;	
@@ -79,7 +79,7 @@ struct CdsRange(T){
 		return data[ (sliceCoef[0] - 1) * sliceCoef[1] + sliceCoef[2]];
 	}
 
-	@property CdsRange save() {
+	@property DsRange save() {
 		return this;	
 	}
 
@@ -103,16 +103,16 @@ struct CdsRange(T){
 }
 
 
-class Cds{
+class Dataset{
 
 private:
 
-	Cds* m_pCds;
+	DasDs* m_pDasDs;
 	int m_nRank;
 
 	string[] m_datasets;
 
-	string[] m_coordinates; // All coordinates of all datasets in the Cds
+	string[] m_coordinates; // All coordinates of all datasets in the DasDs
 	string[][string] m_coordsOfDict; // Associative array to get coordinates of a 
 									 // specific dataset
 	
@@ -120,14 +120,14 @@ private:
 	int[][string] m_shapeOfDict; // Defined similar to m_coordsOfDict
 
 
-	this(Cds* pCds){
-		m_pCds = pCds;  //check is non-null
-		m_nRank = Cds_rank(m_pCds);
+	this(DasDs* pDasDs){
+		m_pDasDs = pDasDs;  //check is non-null
+		m_nRank = DasDs_rank(m_pDasDs);
 	}
 
 public:	
 	~this(){ 
-		del_Cds(m_pCds); 
+		del_DasDs(m_pDasDs); 
 	}
 
 	/** Provides a list of dataset IDs.
@@ -136,7 +136,7 @@ public:
 	string[] datasets() @property {
 		if(m_datasets.length ==  0){
 			char*[] aDs = new char*[m_nRank];
-			size_t uSets = Cds_datasets(m_pCds, aDs.ptr);
+			size_t uSets = DasDs_datasetIds(m_pDasDs, aDs.ptr);
 			m_datasets = new string[uSets];
 			foreach(int i; 0 .. m_nRank){
 				m_datasets[i] = to!string(aDs[i]);
@@ -151,7 +151,7 @@ public:
 	string[] coordinates() @property {
 		if(m_coordinates.length == 0){ 
 			char*[] aCoord;
-			size_t uCoords = Cds_coords(m_pCds, aCoord.ptr);		
+			size_t uCoords = DasDs_coordIds(m_pDasDs, aCoord.ptr);		
 			m_coordinates = new string[uCoords];
 			foreach(ulong i; 0 .. uCoords){
 				m_coordinates[i] = to!string(aCoord[i]);
@@ -167,7 +167,7 @@ public:
 	string[] coordinatesOf(string dataset){
 		if(m_coordsOfDict[dataset].length == 0){
 			char*[] aCoord;
-			size_t uCoords = Cds_coordsOf(m_pCds, toStringz(dataset), aCoord.ptr);	
+			size_t uCoords = DasDs_coordsOf(m_pDasDs, toStringz(dataset), aCoord.ptr);	
 			m_coordsOfDict[dataset] = new string[uCoords];
 			foreach(ulong i; 0 .. uCoords){
 				m_coordsOfDict[dataset][i] = to!string(aCoord[i]);
@@ -181,7 +181,7 @@ public:
 	int[] shape() @property {
 		if(m_shape.length == 0){ 
 			int[] aShape;
-			size_t uShape = Cds_shape(m_pCds, aShape.ptr);		
+			size_t uShape = DasDs_shape(m_pDasDs, aShape.ptr);		
 			m_shape = new int[uShape];
 			foreach(ulong i; 0 .. uShape){
 				m_shape[i] = to!int(aShape[i]);
@@ -197,7 +197,7 @@ public:
 	int[] shapeOf(string dataset){
 		if(m_shapeOfDict[dataset].length == 0){
 			int[] aShape;
-			size_t uSets = Cds_shapeOf(m_pCds, toStringz(dataset), aShape.ptr);
+			size_t uSets = DasDs_shapeOf(m_pDasDs, toStringz(dataset), aShape.ptr);
 			foreach(ulong i; 0 .. uSets){
 				m_shapeOfDict[dataset][i] =	aShape[i]; 	
 			}
@@ -219,26 +219,26 @@ public:
 	bool isOrthogonal(string[] coordinates){
 		foreach(ulong i; 0  .. coordinates.length - 1){
 			foreach(ulong j; i .. coordinates.length - 1){
-				if( i == j || Cds_orthogonal(m_pCds, toStringz(coordinates[i]), toStringz(coordinates[j]))) continue;
+				if( i == j || DasDs_orthogonal(m_pDasDs, toStringz(coordinates[i]), toStringz(coordinates[j]))) continue;
 				else return false;
 			}
 		}		
 		return true; 
 	}
 
-	/** Returns a CdsRange (RandomAccessRange) of values.
+	/** Returns a DsRange (RandomAccessRange) of values.
 	 * @param dataset The string ID of the dataset to be sliced.
 	 * @param coordinate The string ID of the coordinate to be sliced.
 	 * @param index The index to slice at.
-	 * @return CdsRange The range of values.
+	 * @return DsRange The range of values.
 	*/
-	CdsRange!T slice(T)(string dataset, string coordinate, int index) {
+	DsRange!T slice(T)(string dataset, string coordinate, int index) {
 			
 		int[3] coefficients = new int[3];
-		void* dataBegin = Cds_slice1D(
-			m_pCds, toStringz(dataset), toStringz(coordinate), index, coefficients.ptr
+		void* dataBegin = DasDs_slice1D(
+			m_pDasDs, toStringz(dataset), toStringz(coordinate), index, coefficients.ptr
 		);	
-		return *(new CdsRange!T(coefficients, cast(T*)dataBegin));
+		return *(new DsRange!T(coefficients, cast(T*)dataBegin));
 	}
 }
 
@@ -250,19 +250,19 @@ public:
  *         members if there was an error reading standard input or if the
  *         standard input was not a Das2 stream
  */
-Cds[] buildFromDas2Stdin(string sProgName)
+DasDs[] buildFromDas2Stdin(string sProgName)
 {
-	Cds[] lCds;
+	DasDs[] lDasDs;
 	// Just use the libdas2 function to get everything.  For now we will just
 	// assume that the supplied data are all that were available for a three
 	// day period
 	size_t uSets;
-	cordata** lRawCds = build_from_stdin(toStringz(sProgName), &uSets);
+	DasDs** lRawDasDs = build_from_stdin(toStringz(sProgName), &uSets);
 	if(uSets == 0) dasInfo("No datasets present in the input");
 
-	lCds.length = uSets;
+	lDasDs.length = uSets;
 	foreach(ulong i; 0 .. uSets)
-		lCds[i] = new Cds(lRawCds[i]);	
+		lDasDs[i] = new DasDs(lRawDasDs[i]);	
 
-	return lCds;
+	return lDasDs;
 }

@@ -8,7 +8,7 @@ module das2;
  *        go ahead and add it.  Ask chris-piker@uiowa.edu if you need help.
  *
  * To use libdas2 when compiling D programs, simply include this module file
- * (libdas2_d.a) on the compiler command line as well as the libdas2.a
+ * (libdas2_d.a) on the compiler command line as well as the libdas2.3.a
  *  object itself.  For example:
  *
  * dmd your_file1.d your_file2.d /lib/dir/libdas2_d.a /lib/dir/libdas2.a
@@ -18,12 +18,13 @@ module das2;
  */
 
 public import das2.util;
+public import das2.reader;
 public import das2.daspkt;
 public import das2.dft;
 public import das2.time;
 public import das2.units;
-public import das2.cordata;
-public import das2.builder;
+/* public import das2.dataset; */
+/* public import das2.builder; */
 public import das2.log;
 
 
