@@ -13,6 +13,8 @@ import std.bitmanip;
 import std.traits;
 import std.string;
 
+import das2.time;
+
 /** ************************************************************************
  * Handles buffering data and prepending proper header ID's for Das2 Headers
  * All output is in UTF-8.
@@ -148,12 +150,12 @@ void sendException(File fOut, string sType, string sMsg){
 
 
 /* ************************************************************************ */
-/* Help text looks like trash, improve printing */
-
-//void helpPrinter(string sHdr, GetoptResult res){
-//	Output output = stdout.lockingTextWriter();
-//
-//}
+void sendNoData(File fOut, DasTime dtBeg, DasTime dtEnd){
+	auto buf = new HdrBuf(0);
+	auto sMsg = format("No data in the interval %s to %s", 
+	                   dtBeg.toIsoC(3), dtEnd.toIsoC(3));
+	sendException(fOut, "NoDataInInterval", sMsg);
+}
 
 
 
