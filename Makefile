@@ -31,12 +31,12 @@ ifeq ($(INST_DOC),)
 INST_DOC=$(PREFIX)/doc
 endif
 
-ifeq ($(INST_INC),)
-INST_INC=$(PREFIX)/include
-endif
-
 ifeq ($(N_ARCH),)
 N_ARCH=$(shell uname -s).$(shell uname -p)
+endif
+
+ifeq ($(INST_INC),)
+INST_INC=$(PREFIX)/include/$(N_ARCH)
 endif
 
 ifeq ($(INST_NAT_BIN),)
@@ -45,6 +45,10 @@ endif
 
 ifeq ($(INST_NAT_LIB),)
 INST_NAT_LIB=$(PREFIX)/lib/$(N_ARCH)
+endif
+
+ifeq ($(INST_MOD_SRC),)
+INST_MOD_SRC=$(PREFIX)/lib/D2
 endif
 
 BUILD_DIR:=build.$(N_ARCH)

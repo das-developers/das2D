@@ -35,7 +35,7 @@ DLIBS=$(DASLIBS) -L-lfftw3 -L-lexpat -L-lz -L-lm
 
 TREE_SRCS=$(patsubst %.d,das2/%.d,$(TARG_SRCS))
 
-INST_SRCS = $(patsubst %.d,$(PREFIX)/src/D/das2/%.d,$(TARG_SRCS))
+INST_SRCS = $(patsubst %.d,$(INST_MOD_SRC)/das2/%.d,$(TARG_SRCS))
 
 BUILD_UTIL_PROGS= $(patsubst %,$(BD)/%, $(UTIL_PROGS))
 INST_UTIL_PROGS= $(patsubst %,$(INST_NAT_BIN)/%, $(UTIL_PROGS))
@@ -58,7 +58,7 @@ $(INST_NAT_LIB)/%.a:$(BD)/%.a
 	install -D -m 664 $< $@
 
 # Pattern rule for installing D module files
-$(PREFIX)/src/D/das2/%.d:das2/%.d
+$(INST_MOD_SRC)/das2/%.d:das2/%.d
 	install -D -m 664 $< $@
 
 # Direct make not to nuke the intermediate .o files
