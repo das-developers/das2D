@@ -4,7 +4,7 @@ import das2c.units;
 
 /** Wrapper around das2c.das_units objects.  Ineroperable with them */
 struct Units {
-	das_units du = das2c.units.UNIT_DIMENSIONLESS;
+	das2c.units.das_units du = das2c.units.UNIT_DIMENSIONLESS;
 	
 	this(das_units ou) {
 		du = ou;
@@ -21,6 +21,11 @@ struct Units {
 		return fromStringz(sBuf);
 	}
 	
+	double convert(double rVal, Units from);
+	
+	bool canConvert(Units from);
+	
+	bool haveCalRep();
 	
 	
 }
