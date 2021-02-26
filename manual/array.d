@@ -2,16 +2,14 @@ module das2.array;
 
 import std.string;
 
-alias byte = uint8_t;
-
 enum element_type {
 	etUnknown = 0,	etIndex, etByte, etUShort, etShort,	etInt, etLong,
 	etFloat, etDouble, etTime,	etText
 };
 
-const void* et_fill(element_type et);
-size_t et_size(element_type et);
-const char* et_name(element_type et);
+extern(C) const(void)* et_fill(element_type et);
+extern(C) size_t et_size(element_type et);
+extern(C) const(char)* et_name(element_type et);
 
 
 struct child_info_t{
@@ -19,7 +17,7 @@ struct child_info_t{
 	size_t uCount;
 }
 
-alias index_info = child_info_t;
+alias das_index_info = child_info_t;
 
 struct dyna_buf{
 	byte* pBuf;
@@ -45,10 +43,10 @@ alias DynaBuf = dyna_buf;
 struct das_array {
 	char[64]      sId;
 	int           nRank;
-	index_info*   pIdx0;
+	das_index_info*   pIdx0;
 
 	/* bool      bTopOwned;*/   /* Same as pIdx0 == &index0 */
-	index_info   index0;   /* Storage for element 0 of buffer 0, if needed */
+	das_index_info   index0;   /* Storage for element 0 of buffer 0, if needed */
 
 	DynaBuf*[16] pBufs;
 
@@ -60,18 +58,24 @@ struct das_array {
 	int nSrcPktId;
 	size_t uStartItem;
 	size_t uItems;
-
+	
+	int refcount;
+	struct das_array* pMemOwner;
+	
+	unsigned int uFlags;      /* Store flags indicating intended use */
+	
+	das_units units;
 };
 
-private extern (C) void del_DasAry(DasAry* pThis);
+private extern (C) void del_DasAry(das_array* pThis);
 
 private extern (C) byte* DasAry_disownElements(DasAry* pThis, size_t* pLen);
 
-private extern (C) const char* DasAry_id(const DasAry* pThis);
+private extern (C) const(char)* DasAry_id(const DasAry* pThis);
 
 private extern (C) enum element_type DasAry_elementType(const DasAry* pThis);
 
-private extern (C) const char* DasAry_type(const DasAry* pThis);
+private extern (C) const(char)* DasAry_type(const DasAry* pThis);
 
 private extern (C) char* DasAry_info(const DasAry* pThis, char* sInfo, size_t uLen);
 
@@ -85,14 +89,14 @@ private extern (C) int DasAry_shape(const DasAry* pThis, size_t* pShape);
 
 private extern (C) bool DasAry_validAt(const DasAry* pThis, ptrdiff_t* pLoc);
 
-private extern (C) const void* DasAry_getAt(const DasAry* pThis, element_type et, ptrdiff_t* pLoc);
+private extern (C) const(void)* DasAry_getAt(const DasAry* pThis, element_type et, ptrdiff_t* pLoc);
 
 
 private extern (C) bool DasAry_putAt(
 	DasAry* pThis, ptrdiff_t* pStart, const void* pVals, size_t uVals
 );
 
-private extern (C) const void* DasAry_getIn(
+private extern (C) const(void)* DasAry_getIn(
 	const DasAry* pThis, element_type et, int nDim, ptrdiff_t* pLoc, size_t* pCount
 );
 
@@ -161,7 +165,7 @@ class DasAry
 		}
 
 		~this(){
-			DasAry_del(m_pDa); 
+			del_DasAry(m_pDa); 
 		}
 
 		string id() const {

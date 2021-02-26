@@ -24,7 +24,7 @@ DC=dmd
 DFLAGS=-g -od$(PWD)/$(BD) -w -m64 -debug
 #DFLAGS=-ggdb -Wall -Idas2
 
-DASLIBS=-L-L$(BD) -L-L../../$(BD) -L-ldas2_d -L-ldas2
+DASLIBS=-L-L$(BD) -L-L../../$(BD) -L-ldas2_d -L-ldas2.3
 #DASLIBS=-L$(BD) -L../../$(BD) -ldas2
 
 DLIBS=$(DASLIBS) -L-lfftw3 -L-lexpat -L-lz -L-lm
@@ -33,7 +33,7 @@ DLIBS=$(DASLIBS) -L-lfftw3 -L-lexpat -L-lz -L-lm
 ##############################################################################
 # Derived definitions
 
-TREE_SRCS=$(patsubst %.d,das2/%.d,$(TARG_SRCS))
+TREE_SRCS=$(patsubst %.d,source/%.d,$(TARG_SRCS))
 
 INST_SRCS = $(patsubst %.d,$(INST_MOD_SRC)/das2/%.d,$(TARG_SRCS))
 

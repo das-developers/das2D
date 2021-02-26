@@ -1,0 +1,30 @@
+{
+	"authors": [
+		"Chris Piker"
+	],
+	"description": "D bindings for the das2 C library",
+	"authors": ["Chris Piker"],
+	"license": "public domain",
+	"name": "das2c",
+	"homepage": "https://github.com/das-developers/das2D",
+	"targetType": "none",
+	"dependencies":{
+		"das2c:wrapper":    "*",
+		"das2c:test_units": "*",
+	},
+	"subPackages":[
+		{
+			"name":"wrapper",
+			"targetType":"sourceLibrary",
+			"sourcePaths":["das2c"],
+		},
+		{
+			"name":"test_units",
+			"targetType":"executable",
+			"sourceFiles":["test/test_units.d"],
+			"libs":[
+				"das2.3", "fftw3",  "expat", "ssl", "crypto", "z", "m", "pthread"
+			]
+		}
+	]
+}

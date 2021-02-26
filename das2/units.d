@@ -1,28 +1,30 @@
 module das2.units;
 
-import das2.time;
+import das2c.units;
 
-// Units
-alias UnitType = const(char)*; // No class for units, just manipulates unsafe 
-                               // string pointers
+/** Wrapper around das2c.das_units objects.  Ineroperable with them */
+struct Units {
+	das_units du = das2c.units.UNIT_DIMENSIONLESS;
+	
+	this(das_units ou) {
+		du = ou;
+	}
+	this(string str)}
+		du = Units_fromStr(str);
+	}
+	string toString() {
+		return fromStringz(du);
+	}
+	string toLabel() {
+		char[64] sBuf;
+		Units_toLabel(du, sBuf.ptr, sBuf.length);
+		return fromStringz(sBuf);
+	}
+	
+	
+	
+}
 
+const Units UNIT_US2000 = Units(das2.units.UNIT_US2000);
+const Units UNIT_HERTZ  = Units(das2.units.UNIT_HERTZ);
 
-extern(C) extern const(char*) UNIT_US2000; /* microseconds since midnight, Jan 1, 2000 */
-
-extern(C) extern const(char*) UNIT_T2000;
-extern(C) extern const(char*) UNIT_T1970;
-
-
-extern (C) UnitType Units_fromStr(const char* string);
-extern (C) const (char)* Units_toStr(UnitType unit);
-extern (C) char* Units_toLabel(UnitType unit, char* sBuf, int nLen);
-extern (C) UnitType Units_invert(UnitType unit);
-extern (C) UnitType Units_multiply(UnitType ut1, UnitType ut2);
-extern (C) UnitType Units_divide(UnitType a, UnitType b);
-extern (C) UnitType Units_power(UnitType unit, int power);
-extern (C) UnitType Units_root(UnitType unit, int root );
-extern (C) UnitType Units_interval(UnitType unit);
-extern (C) bool Units_canConvert(UnitType fromUnits , UnitType toUnits);
-extern (C) bool Units_haveCalRep(UnitType unit);
-extern (C) void Units_convertToDt(das_time* pDt, double value, UnitType epoch_units);
-extern (C) double Units_convertFromDt(UnitType epoch_units, const das_time* pDt);
