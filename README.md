@@ -17,6 +17,15 @@ There are three sub-sections to this source library:
 *  **test** - Small test programs which both verify that the package is
   operatin properly, and provide example code.
   
-
+To use the library add:
+```d
+import das2;
+```
+To your modules.  Since the higher level functions are being created as needed
+it may also be necessary to add:
+```d
+import das2c;
+```
+as well.
 
 
