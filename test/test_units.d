@@ -1,4 +1,4 @@
-// Original author, Chris Piker <chris-piker@uiowa.edu> 
+// Author: Chris Piker <chris-piker@uiowa.edu> 
 //
 // This file is intended to demonstrate an interface.  This is free 
 // and unencumbered software released into the public domain 
@@ -34,8 +34,7 @@ int main(string[] args) {
 	
 	/* Test singleton nature of unit values */
 	Units Hz1 = Units("Hz");
-	string sHz2 = "Hz";
-	Units Hz2 = Units(sHz2);
+	Units Hz2 = Units("Hz");
 	if( (Hz1 != Hz2) || (Hz2 != UNIT_HERTZ)){
 		writef("ERROR: Test 1 Failed, %s != %s\n", Hz1, Hz2);
 		return 15;
@@ -43,12 +42,14 @@ int main(string[] args) {
 	
 	/* Test US2000 forward transformations */
 	Units us2000 = UNIT_US2000;
-	DasTime dt = DasTime("2000-1-1T1:00");
-	if(dt.valid)){
+	string sTime = "2000-1-1T1:00";
+	Time dt;
+	try{ dt = Time(sTime); }
+	catch(ConvException ex){
 		writef("ERROR: Test 2 Failed, can't parse %s as a string\n", sTime);
 		return 15;
-	}	
-	double rTime = us2000.convert(&dt);
+	}
+	double rTime = us2000.convert(dt);
 	if( rTime != 3600000000.0){
 		writef("ERROR: Test 2 Failed, %s != %f μs since 2000-01-01\n",
 				sTime, rTime);
@@ -68,7 +69,7 @@ int main(string[] args) {
 
 	/* Test US2000 backward transformations */
 	dt = us2000.toTime(rTime);
-	string sBuf = dt.isoc();
+	string sBuf = dt.isoc(0);
 	if(sBuf != "2000-01-01T01:00:00"){
 		writef("ERROR: Test 3 Failed, %s != %f US2000\n", sBuf, rTime);
 		return 15;
@@ -77,23 +78,23 @@ int main(string[] args) {
 	/* Test MJ1958 units forward transformations */
 	
 	Units mj1958 = UNIT_MJ1958;
-	dt = "2000-001T01:00";
-	if(!dt.valid){
+	try{ dt = Time("2000-001T01:00"); }
+	catch(ConvException ex){ 
 		writef("ERROR: Test 4 Failed, can't parse %s as a string\n", sTime);
 		return 15;
 	}	
-	rTime = mj1958.convert(&dt);
+	rTime = mj1958.convert(dt);
 	if( rTime != 15340.041666666666){
 		writef("ERROR: Test 4 Failed, %s != %f MJ1958\n", sTime, rTime);
 		return 15;
 	}
 
-	dt = DasTime("1958-01-01T13:00");
-	if(!dt.valid)){
+	try{ dt = Time("1958-01-01T13:00"); }
+	catch(ConvException ex){ 
 		writef("ERROR: Test 5 Failed, can't parse %s as a string\n", sTime);
 		return 15;
 	}	
-	rTime = mj1958.convert(&dt);
+	rTime = mj1958.convert(dt);
 	if( rTime != 0.5416666666666666){
 		writef("ERROR: Test 5 Failed, %s != %f MJ1958\n", sTime, rTime);
 		return 15;
@@ -123,7 +124,7 @@ int main(string[] args) {
 	
 	/* Test MJ1958 backward transformation */
 	rTime = 0.541667;
-	DasTime dt1 = mj1958.toTime(rTime);
+	Time dt1 = mj1958.toTime(rTime);
 	sBuf = dt1.isod(0);
 	if(sBuf != "1958-001T13:00:00"){
 		writef("ERROR: Test 8 Failed, %f MJ1958 is not %s UTC\n", rTime, sBuf);
@@ -155,7 +156,6 @@ int main(string[] args) {
 	/* Test unit multiplication */
 	Units h = UNIT_E_SPECDENS;
 	
-	Units i = Units_multiply( Units_power(a, 2), Units_power(UNIT_HERTZ, -1));
 	Units i = a^^2 * UNIT_HERTZ^^-1;
 	
 	if( h != i ){ writef("ERROR: Test 11 Failed, '%s' != '%s' \n", h, i); return 15; }
@@ -227,7 +227,7 @@ int main(string[] args) {
 	string sUnits = "cm**-2 keV**-1 s**-1 sr**-1";
 	Units flux = Units(sUnits);
 	
-	if(sUnits != flux) != 0){
+	if(sUnits != flux){
 		writef("ERROR: Test 19 Failed, unknown units are re-arranged by default. %s != %s\n",
 				 sUnits, flux);
 		return 15;

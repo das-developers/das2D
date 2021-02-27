@@ -133,7 +133,7 @@ alias das_units = const(char)*;
  *
  * @returns a pointer to the singleton string representing these units.
  */
-das_units Units_fromStr (const(char)* string);
+das_units Units_fromStr (const(char)* str);
 
 /** Get the canonical string representation of a das_unit
  * Even though das_unit is a const char*, this function should be used in case

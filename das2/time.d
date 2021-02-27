@@ -5,7 +5,8 @@ import std.math;
 import core.stdc.string;
 public import std.conv: ConvException;
 
-import das2.units;
+import das2c.time;
+
 /**************************************************************************
  * Parse a string representing a UTC time into a SysTime object D's
  * SysTime.fromISOExtString is pretty good, but it can't handle some formats
@@ -99,12 +100,11 @@ string rpwgString(SysTime st, int nSecPrec = 0){
 }
 
 /*****************************************************************************
- * Time handling class that drops time zone complexity and sub-second 
- *  integer units.  Has conversions to epoch times.
- *
- * You should probably use SysTime instead if possible
+ * Time handling class that drops time zone complexity and sub-second integer
+ * units.  To make time handling platform independent, many das2 functions
+ * take or receive instances of this structure.
  */
-struct DasTime{
+struct Time{
 	int year = 1; 
 	int month = 1; 
 	int mday = 1; 
@@ -112,10 +112,6 @@ struct DasTime{
 	int hour = 0;   // redundant, but explicit beats implicit
 	int minute = 0; // default value for ints is 0 
 	double second = 0.0;
-
-	double fEpoch = double.nan;   // Save the epoch value if it has been 
-	                             // computed
-	UnitType ut = null;
 
 	/** Construct a time value using a string */
 	this(const(char)[] s){
@@ -158,18 +154,6 @@ struct DasTime{
 		return dt;
 	}
 
-	this(double value, UnitType units){
-		das_time dt;
-		if(! Units_haveCalRep(units)) 
-			throw new ConvException(
-				format("Unit type %s not convertable to a date-time", Units_toStr(units))
-			);
-		Units_convertToDt(&dt, value, units);
-		setFromDt(&dt);
-		ut = units;
-		fEpoch = value;
-	}
-
 	/** Create a time using a vairable length tuple.
 	 * 
 	 * Up to 6 arguments will be recognized, at least one must be given
@@ -189,20 +173,7 @@ struct DasTime{
 		static if(args.length > 5) second = args[5];
 	}
 
-	double epoch(UnitType units){
-		if(ut != units){
-			if(! Units_haveCalRep(units)) 
-			throw new ConvException(
-				format("Unit type %s not convertable to a date-time", Units_toStr(units))
-			);
-			ut = units;
-			das_time dt = toDt();
-			fEpoch = Units_convertFromDt(units, &dt);
-		}
-		return fEpoch;
-	}
-
-	string toIsoC(int fracdigits) const{
+	string isoc(int fracdigits) const{
 		char[64] aBuf = '\0';
 		das_time dt = toDt();
 		dt_isoc(aBuf.ptr, 63, &dt, fracdigits);
@@ -210,33 +181,30 @@ struct DasTime{
 	}
 
   
-	string toString() const{ return toIsoC(6); }
+	string toString() const{ return isoc(6); }
   
 
-  void norm(){
-    das_time dt = toDt(); 
-    dt_tnorm(&dt);
-    setFromDt(&dt);
-	 if(ut !is null){
-		 fEpoch = Units_convertFromDt(ut, &dt);
-	 }
-  }
+	void norm(){
+		das_time dt = toDt(); 
+		dt_tnorm(&dt);
+		setFromDt(&dt);
+	}
 
-	string toIsoD(int fracdigits) const{
+	string isod(int fracdigits) const{
 		char[64] aBuf = '\0';
 		das_time dt = toDt();
 		dt_isod(aBuf.ptr, 63, &dt, fracdigits);
 		return aBuf.idup[0..strlen(aBuf.ptr)];
 	}
 
-	string toDual(int fracdigits) const{
+	string dual(int fracdigits) const{
 		char[64] aBuf = '\0';
 		das_time dt = toDt();
 		dt_dual_str(aBuf.ptr, 63, &dt, fracdigits);
 		return aBuf.idup[0..strlen(aBuf.ptr)];
 	}
 
-	int opCmp(in DasTime other) const {
+	int opCmp(in Time other) const {
 		if(year < other.year) return -1; if(year > other.year) return 1;
 		if(month < other.month) return -1; if(month > other.month) return 1;
 		if(mday < other.mday) return -1; if(mday > other.mday) return 1;
