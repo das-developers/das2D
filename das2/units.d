@@ -1,9 +1,14 @@
 module das2.units;
 
 public import std.conv: ConvException;
+import std.format;
+import std.string;
+import std.conv;
 
 import das2c.units;
 import das2c.operator;
+import das2c.time;
+
 import das2.time;
 
 /** Wrapper around das2c.das_units objects.  Ineroperable with them */
@@ -19,13 +24,13 @@ struct Units {
 	}
 	
 	string toString() const {
-		return fromStringz(du);
+		return to!string(du);
 	}
 	
 	Time toTime(double rTime) const {
 		if(!Units_haveCalRep(du)){
 			throw new ConvException(
-				format("Units %s not convertable to a calendar time.", s)
+				format!"Units %s not convertable to a calendar time."(this)
 			);
 		}
 		das_time dt;
@@ -34,9 +39,9 @@ struct Units {
 	}
 	
 	string toLabel() const {
-		char[64] sBuf = 0x0;
+		char[64] sBuf;
 		Units_toLabel(du, sBuf.ptr, sBuf.length);
-		return fromStringz(sBuf);
+		return to!string(sBuf);
 	}
 	
 	/+ Generic value conversion utility
@@ -61,29 +66,30 @@ struct Units {
 	/++ Encode a broken down das2 Time as an epoch time in these units 
 	 +/
 	double convert(ref const(Time) dt) const {
-		return Units_convertFromDt(du, &dt);
+		das_time cstruct = dt.toDt();
+		return Units_convertFromDt(du, &cstruct);
 	}
 	
-	bool canConvert(Units from){
-		return Units_canConvert(from, du);
+	bool canConvert(Units other) const {
+		return Units_canConvert(other.du, du);
 	}
 	
-	bool haveCalRep(){
+	bool haveCalRep() const {
 		return Units_haveCalRep(du);
 	}
 	
-	Units opBinary(string op)(ref Units units) const{
+	Units opBinary(string op)(const(Units) other) const{
 		static if(op == "*"){
-			if(!Units_canMerge(du, D2BOP_MUL, units.du))
+			if(!Units_canMerge(du, D2BOP_MUL, other.du))
 				throw new ConvException(
-					format("Units %s and %s can not be multiplied", this, units)
+					format!"Units %s and %s can not be multiplied"( this, other)
 				);	
 			
-			return Units(Units_multipy(ud, units.du));
+			return Units(Units_multiply(du, other.du));
 		}
 		else static assert(false, "Operator "~op~" not implemented");
 	}
-	
+		
 	/** Raise a unit to a positive or negative power.
 	 * To invert the units raise them to the -1 power.
 	 */
@@ -92,6 +98,10 @@ struct Units {
 			return Units(Units_power(du, nPow));
 		}
 		else static assert(false, "Operator "~op~" not implemented");
+	}
+	
+	bool opEquals()(auto ref const Units other) const{
+		return (du == other.du);
 	}
 	
 	/** Reduce units to a root
@@ -117,7 +127,7 @@ struct Units {
 	double secondsSinceMidnight(double rVal) const{
 		if(!Units_haveCalRep(du)){
 			throw new ConvException(
-				format("Units %s not convertable to a calendar time.", s)
+				format!"Units %s not convertable to a calendar time."(this)
 			);
 		}
 		return Units_secondsSinceMidnight(rVal, du);
@@ -126,7 +136,7 @@ struct Units {
 	int getJulianDay(double rVal) const{
 		if(!Units_haveCalRep(du)){
 			throw new ConvException(
-				format("Units %s not convertable to a calendar time.", s)
+				format!"Units %s not convertable to a calendar time."(this)
 			);
 		}
 		return Units_getJulianDay(rVal, du);
@@ -135,82 +145,15 @@ struct Units {
 	Units interval() const{
 		if(!Units_haveCalRep(du)){
 			throw new ConvException(
-				format("Units %s not convertable to a calendar time.", s)
+				format!"Units %s not convertable to a calendar time."(this)
 			);
 		}
 		return Units( Units_interval(du) );
 	}
 	
 	Units reduce(ref double rFactor) const {
-		return Units(Units_reduce(du, &rFactar));
+		return Units(Units_reduce(du, &rFactor));
 	}
-}
-
-immutable Units UNIT_DIMENSIONLESS;
-
-immutable Units UNIT_US2000;
-immutable Units UNIT_MJ1958;
-immutable Units UNIT_T2000;
-immutable Units UNIT_T1970;
-immutable Units UNIT_NS1970;
-immutable Units UNIT_UTC;
-
-immutable Units UNIT_SECONDS;
-immutable Units UNIT_HOURS;
-immutable Units UNIT_DAYS;
-immutable Units UNIT_MILLISECONDS;
-immutable Units UNIT_MICROSECONDS;
-immutable Units UNIT_NANOSECONDS;
-
-immutable Units UNIT_HERTZ;
-immutable Units UNIT_KILO_HERTZ;
-immutable Units UNIT_MEGA_HERTZ;
-immutable Units UNIT_E_SPECDENS;
-immutable Units UNIT_B_SPECDENS;
-immutable Units UNIT_NT;
-
-immutable Units UNIT_NUMBER_DENS;
-immutable Units UNIT_DB;
-immutable Units UNIT_KM;
-immutable Units UNIT_EV;
-immutable Units UNIT_DEGREES;
-
-
-shared static this(){
-	UNIT_DIMENSIONLESS = Units(das2c.units.UNIT_DIMENSIONLESS);
-
-	UNIT_US2000 = Units(das2c.units.UNIT_US2000);
-	UNIT_HERTZ  = Units(das2c.units.UNIT_HERTZ);
-	UNIT_US2000 = Units(das2c.units.UNIT_US2000);
-	UNIT_MJ1958 = Units(das2c.units.UNIT_MJ1958);
-	UNIT_T2000  = Units(das2c.units.UNIT_T2000);
-	UNIT_T1970  = Units(das2c.units.UNIT_T1970);
-	UNIT_NS1970 = Units(das2c.units.UNIT_NS1970);
-	UNIT_UTC    = Units(das2c.units.UNIT_UTC);
-
-	UNIT_SECONDS      = Units(das2c.units.UNIT_SECONDS);
-	UNIT_HOURS        = Units(das2c.units.UNIT_HOURS);
-	UNIT_DAYS         = Units(das2c.units.UNIT_DAYS);
-	UNIT_MILLISECONDS = Units(das2c.units.UNIT_MILLISECONDS);
-	UNIT_MICROSECONDS = Units(das2c.units.UNIT_MICROSECONDS);
-	UNIT_NANOSECONDS  = Units(das2c.units.UNIT_NANOSECONDS);
-
-	UNIT_HERTZ      = Units(das2c.units.UNIT_HERTZ);
-	UNIT_KILO_HERTZ = Units(das2c.units.UNIT_KILO_HERTZ);
-	UNIT_MEGA_HERTZ = Units(das2c.units.UNIT_MEGA_HERTZ);
-	UNIT_E_SPECDENS = Units(das2c.units.UNIT_E_SPECDENS);
-	UNIT_B_SPECDENS = Units(das2c.units.UNIT_B_SPECDENS);
-	UNIT_NT         = Units(das2c.units.UNIT_NT);
-	
-	UNIT_NUMBER_DENS = Units(das2c.units.UNIT_NUMBER_DENS);
-	
-	UNIT_DB = Units(das2c.units.UNIT_DB);
-	
-	UNIT_KM = Units(das2c.units.UNIT_KM);
-	
-	UNIT_EV = Units(das2c.units.UNIT_EV);
-	
-	UNIT_DEGREES = Units(das2c.units.UNIT_DEGREES);
 }
 
 

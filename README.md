@@ -29,3 +29,15 @@ import das2c;
 as well.
 
 
+## Building
+
+You'll have to provide the location to your libdas2.3.so file using the
+`LIBDAS2_PATH` environment variable.  For example, assume you've built das2C
+in your home directory with `N_ARCH` set to `ubuntu20`, then, to build this
+modules executable you might run:
+
+```bash
+env LIBDAS2_PATH=$HOME/git/das2C/build.ubuntu20 dub build
+```
+
+

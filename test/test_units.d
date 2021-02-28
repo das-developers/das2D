@@ -26,6 +26,8 @@
 //
 // For more information, please refer to <http://unlicense.org/>
 
+module test_units;
+
 import std.stdio;
 import std.string;
 import das2;
@@ -156,7 +158,7 @@ int main(string[] args) {
 	/* Test unit multiplication */
 	Units h = UNIT_E_SPECDENS;
 	
-	Units i = a^^2 * UNIT_HERTZ^^-1;
+	Units i = (a^^2) * (UNIT_HERTZ^^-1);
 	
 	if( h != i ){ writef("ERROR: Test 11 Failed, '%s' != '%s' \n", h, i); return 15; }
 	
@@ -167,13 +169,13 @@ int main(string[] args) {
 	
 	/* Test interval units for us2000 */
 	Units l = UNIT_US2000.interval();
-	Units m = Units.invert( Units("MHz") );
+	Units m = Units("MHz").invert();
 	if( l != m ){ writef("ERROR: Test 13 Failed, '%s' != '%s' \n", l, m); return 15; }
 	
 	
 	/* Test unit conversions */
 	Units ms = Units("microsecond");
-	Units delta = ms**-1;
+	Units delta = ms^^-1;
 	double rFactor = UNIT_HERTZ.convert(1.0, delta);
 	if( rFactor != 1.0e+6){ 
 		write("ERROR: Test 14 Failed, '%s' to '%s' factor = %.1e, expected 1.0e+06\n", 
@@ -200,7 +202,7 @@ int main(string[] args) {
 	Units O_reduced = O.reduce(rFactor);
 	Units muO = Units("μΩ");
 	
-	Units muO_reduced = mu0.reduce(rFactor);
+	Units muO_reduced = muO.reduce(rFactor);
 	if(O_reduced != muO_reduced ){
 		writef("ERROR: Test 16 Failed, %s != %s\n", O_reduced, muO_reduced);
 		return 15;
@@ -227,8 +229,8 @@ int main(string[] args) {
 	string sUnits = "cm**-2 keV**-1 s**-1 sr**-1";
 	Units flux = Units(sUnits);
 	
-	if(sUnits != flux){
-		writef("ERROR: Test 19 Failed, unknown units are re-arranged by default. %s != %s\n",
+	if(flux.toString() != sUnits){
+		writef("ERROR: Test 19 Failed, unknown units are re-arranged by default. '%s' != '%s'\n",
 				 sUnits, flux);
 		return 15;
 	}
@@ -249,7 +251,7 @@ int main(string[] args) {
 	sUnits = "eV/(cm**-2 s**1 sr**1 eV**1)";
 	Units energy_flux = Units(sUnits);
 	Units test_e_flux = Units("m**2 s**-1 sr**-1");
-	Units reduced_flux = energy_flux.reduce(&rFactor);
+	Units reduced_flux = energy_flux.reduce(rFactor);
 	
 	if( reduced_flux != test_e_flux){
 		writef("ERROR: Test 21 Failed, eV did not cancel: %s (expected %s)\n",

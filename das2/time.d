@@ -1,3 +1,6 @@
+module das2.time;
+
+
 import std.string;
 import std.datetime;
 import core.time;
@@ -6,6 +9,7 @@ import core.stdc.string;
 public import std.conv: ConvException;
 
 import das2c.time;
+import das2c.das1;
 
 /**************************************************************************
  * Parse a string representing a UTC time into a SysTime object D's
@@ -28,8 +32,9 @@ SysTime parsetime(string s){
 	double rSec;
 	int ret = 0;
 
-	ret = parsetime(c_str, &year, &month, &day_month, &day_year, &hour,
-	                  &minute, &rSec);
+	ret = das2c.das1.parsetime(
+		c_str, &year, &month, &day_month, &day_year, &hour, &minute, &rSec
+	);
 	if(ret != 0){
 		throw new DateTimeException(
 			format("'%s' could not be parsed as a datetime", s)
@@ -117,7 +122,9 @@ struct Time{
 	this(const(char)[] s){
 		int nRet;
 		//infof("Parsting time string: %s", s);
-		nRet = parsetime(s.toStringz(),&year,&month,&mday,&yday,&hour,&minute,&second);
+		nRet = das2c.das1.parsetime(
+			s.toStringz(), &year, &month, &mday, &yday, &hour, &minute, &second
+		);
 		if(nRet != 0)
 			throw new ConvException(format("Error parsing %s as a date-time", s));
 	}
