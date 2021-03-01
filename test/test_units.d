@@ -26,8 +26,6 @@
 //
 // For more information, please refer to <http://unlicense.org/>
 
-module test_units;
-
 import std.stdio;
 import std.string;
 import das2;
@@ -183,6 +181,7 @@ int main(string[] args) {
 		return 15;
 	}
 	
+	/* Test SI prefixes on unknown units, in this case donuts */
 	Units perday = Units("kilodonut/day");
 	Units persec = Units("donut hertz");
 	

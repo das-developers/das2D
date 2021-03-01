@@ -110,10 +110,10 @@ string rpwgString(SysTime st, int nSecPrec = 0){
  * take or receive instances of this structure.
  */
 struct Time{
-	int year = 1; 
-	int month = 1; 
-	int mday = 1; 
-	int yday = 1;   // Typically read only except for normDoy()
+	int year = 0; 
+	int month = 0; 
+	int mday = 0; 
+	int yday = 0;   // Typically read only except for normDoy()
 	int hour = 0;   // redundant, but explicit beats implicit
 	int minute = 0; // default value for ints is 0 
 	double second = 0.0;
@@ -138,6 +138,8 @@ struct Time{
 		minute = dt.minute;
 		second = dt.second;
 	}
+	
+	bool valid(){ return month != 0;}
 
 	void setFromDt(das_time* pDt){
 		year = pDt.year;
