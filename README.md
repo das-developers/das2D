@@ -60,7 +60,7 @@ Unlike [das2C](https://github.com/das-developers/das2C) there is no need to call
 das2_init(); // <-- not needed in D code due to module initilizers
 ```
 at the beginning of each program that uses das2D.  A `shared static this()` 
-block in the `package.d` file handles runtime initialization.
+block in the `das2/package.d` file handles runtime initialization.
 
 
 
