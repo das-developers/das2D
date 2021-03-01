@@ -45,10 +45,13 @@ Das2D is mostly a source library, though small test programs can be (and should
 be) built that demonstrate functionality and test the library.  The DMD command
 line that I typically use with external das2D based projects is:
 ```bash
-dmd -i -I$(DAS2D_TOP_DIR) -L-ldas2.3 -L-lexpat -L-lssl -L-lcrypto -L-lfftw3 \
-    -L-lz -L-lm -L-lpthread
+dmd -i -I$(DAS2D_TOP_DIR) -L-L$(DAS2C_BUILD_DIR) -L-ldas2.3 -L-lexpat -L-lssl \
+    -L-lcrypto -L-lfftw3 -L-lz -L-lm -L-lpthread
 ```
-Most of the switches are used to pickup das2C and it's dependencies.  The `-i`
-switch is important as that directs DMD to compile any imported modules.
+Most of the switches are used to pickup libdas2.3.so and it's dependencies.  The
+`-i` switch is important as that directs DMD to compile any imported modules. 
+Since this module uses the MIT license, but das2C is LGPL it's best to link against
+the shared object libdas2.3.so instead of libdas2.3.a to avoid license entanglements.
+
 
 
