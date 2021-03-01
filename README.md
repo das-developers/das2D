@@ -9,7 +9,8 @@ missions as well as the Long Wave Array (LWA-1) radio astronomy station.
 There are three sub-sections to this source library:
 
 * **das2c** - A straight [dstep](https://github.com/jacob-carlborg/dstep)
-  conversion of the das2C headers to D modules.
+  conversion of the [das2C](https://github.com/das-developers/das2C) headers
+  to D modules.
 			 
 * **das2** - struct & classes that wrap das2C to provide a more comfortable
   interface.
@@ -41,9 +42,10 @@ env LIBDAS2_PATH=$HOME/git/das2C/build.ubuntu20 dub build
 ```
 
 ## Using in Projects
-Das2D is mostly a source library, though small test programs can be (and should
-be) built that demonstrate functionality and test the library.  The DMD command
-line that I typically use with external das2D based projects is:
+
+Das2D is mostly a source library, though small test programs are included to 
+demonstrate functionality and serve as unit tests.  The DMD command line that
+I typically use with external das2D based projects is:
 ```bash
 dmd -i -I$(DAS2D_TOP_DIR) -L-L$(DAS2C_BUILD_DIR) -L-ldas2.3 -L-lexpat -L-lssl \
     -L-lcrypto -L-lfftw3 -L-lz -L-lm -L-lpthread
@@ -52,6 +54,14 @@ Most of the switches are used to pickup libdas2.3.so and it's dependencies.  The
 `-i` switch is important as that directs DMD to compile any imported modules. 
 Since this module uses the MIT license, but das2C is LGPL it's best to link against
 the shared object libdas2.3.so instead of libdas2.3.a to avoid license entanglements.
+
+Unlike [das2C](https://github.com/das-developers/das2C) there is no need to call:
+```
+das2_init(); // <-- not needed in D code due to module initilizers
+```
+at the beginning of each program that uses das2D.  A `shared static this()` 
+block in the `package.d` file handles runtime initialization.
+
 
 
 
