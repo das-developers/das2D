@@ -40,4 +40,15 @@ modules executable you might run:
 env LIBDAS2_PATH=$HOME/git/das2C/build.ubuntu20 dub build
 ```
 
+## Using in Projects
+Das2D is mostly a source library, though small test programs can be (and should
+be) built that demonstrate functionality and test the library.  The DMD command
+line that I typically use with external das2D based projects is:
+```bash
+dmd -i -I$(DAS2D_TOP_DIR) -L-ldas2.3 -L-lexpat -L-lssl -L-lcrypto -L-lfftw3 \
+    -L-lz -L-lm -L-lpthread
+```
+Most of the switches are used to pickup das2C and it's dependencies.  The `-i`
+switch is important as that directs DMD to compile any imported modules.
+
 
