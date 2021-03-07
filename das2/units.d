@@ -33,9 +33,9 @@ struct Units {
 				format!"Units %s not convertable to a calendar time."(this)
 			);
 		}
-		das_time dt;
-		Units_convertToDt(&dt, rTime, du);
-		return Time(dt);
+		Time t;
+		Units_convertToDt(&(t.dt), rTime, du);
+		return t;
 	}
 	
 	string toLabel() const {
@@ -65,9 +65,8 @@ struct Units {
 	
 	/++ Encode a broken down das2 Time as an epoch time in these units 
 	 +/
-	double convert(ref const(Time) dt) const {
-		das_time cstruct = dt.toDt();
-		return Units_convertFromDt(du, &cstruct);
+	double convert(ref const(Time) t) const {
+		return Units_convertFromDt(du, &(t.dt));
 	}
 	
 	bool canConvert(Units other) const {

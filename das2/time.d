@@ -105,63 +105,20 @@ string rpwgString(SysTime st, int nSecPrec = 0){
 }
 
 /*****************************************************************************
- * Time handling class that drops time zone complexity and sub-second integer
- * units.  To make time handling platform independent, many das2 functions
- * take or receive instances of this structure.
+ * Wrap a das_time so that we end up with something that looks more like a 
+ * standard D structure with functions 
  */
+ 
 struct Time{
-	int year = 0; 
-	int month = 0; 
-	int mday = 0; 
-	int yday = 0;   // Typically read only except for normDoy()
-	int hour = 0;   // redundant, but explicit beats implicit
-	int minute = 0; // default value for ints is 0 
-	double second = 0.0;
-
+	das_time dt = {0, 1, 1, 1, 0, 0, 0.0};
+	
 	/** Construct a time value using a string */
 	this(const(char)[] s){
-		int nRet;
-		//infof("Parsting time string: %s", s);
-		nRet = das2c.das1.parsetime(
-			s.toStringz(), &year, &month, &mday, &yday, &hour, &minute, &second
-		);
-		if(nRet != 0)
+		if(!dt_parsetime(s.toStringz(), &dt))
 			throw new ConvException(format("Error parsing %s as a date-time", s));
 	}
-	
-	this(ref das_time dt){
-		year = dt.year;
-		month = dt.month;
-		mday = dt.mday;
-		yday = dt.yday;
-		hour = dt.hour;
-		minute = dt.minute;
-		second = dt.second;
-	}
-	
-	bool valid(){ return month != 0;}
-
-	void setFromDt(das_time* pDt){
-		year = pDt.year;
-		month = pDt.month;
-		mday = pDt.mday;
-		yday = pDt.yday;
-		hour = pDt.hour;
-		minute = pDt.minute;
-		second = pDt.second;
-	}
-
-	das_time toDt() const{
-		das_time dt;
-		dt.year = year;
-		dt.month = month;
-		dt.mday = mday;
-		dt.yday = yday;
-		dt.hour = hour;
-		dt.minute = minute;
-		dt.second = second;
-		return dt;
-	}
+		
+	bool valid(){ return dt.month != 0;}
 
 	/** Create a time using a vairable length tuple.
 	 * 
@@ -174,52 +131,64 @@ struct Time{
 	
 	this(T...)(T args){
 		static assert(args.length > 0);
-		year = args[0];
-		static if(args.length > 1) month = args[1];
-		static if(args.length > 2) mday = args[2];
-		static if(args.length > 3) hour = args[3];
-		static if(args.length > 4) minute = args[4];
-		static if(args.length > 5) second = args[5];
+		dt.year = args[0];
+		static if(args.length > 1) dt.month = args[1];
+		static if(args.length > 2) dt.mday = args[2];
+		static if(args.length > 3) dt.hour = args[3];
+		static if(args.length > 4) dt.minute = args[4];
+		static if(args.length > 5) dt.second = args[5];
+		dt_norm(&dt);
 	}
 
 	string isoc(int fracdigits) const{
 		char[64] aBuf = '\0';
-		das_time dt = toDt();
 		dt_isoc(aBuf.ptr, 63, &dt, fracdigits);
 		return aBuf.idup[0..strlen(aBuf.ptr)];
 	}
 
   
-	string toString() const{ return isoc(6); }
-  
+	string toString() const{ return isoc(6); } 
 
 	void norm(){
-		das_time dt = toDt(); 
 		dt_tnorm(&dt);
-		setFromDt(&dt);
 	}
 
 	string isod(int fracdigits) const{
 		char[64] aBuf = '\0';
-		das_time dt = toDt();
 		dt_isod(aBuf.ptr, 63, &dt, fracdigits);
 		return aBuf.idup[0..strlen(aBuf.ptr)];
 	}
 
 	string dual(int fracdigits) const{
 		char[64] aBuf = '\0';
-		das_time dt = toDt();
 		dt_dual_str(aBuf.ptr, 63, &dt, fracdigits);
 		return aBuf.idup[0..strlen(aBuf.ptr)];
 	}
 
-	int opCmp(in Time other) const {
-		if(year < other.year) return -1; if(year > other.year) return 1;
-		if(month < other.month) return -1; if(month > other.month) return 1;
-		if(mday < other.mday) return -1; if(mday > other.mday) return 1;
-		if(hour < other.hour) return -1; if(hour > other.hour) return 1;
-		if(minute < other.minute) return -1; if(minute > other.minute) return 1;
-		if(second < other.second) return -1; if(second > other.second) return 1;
-		return 0;
+	int opCmp(ref const(Time) other) const {
+		return dt_compare(&dt, &(other.dt));
+	}
+	
+	double opBinary(string op)(ref const(Time) other) const {
+		static if(op == "-"){
+			return dt_diff(&dt, &(other.dt));
+		}
+		else static assert(false, "Only subtraction is defined for two das2 times");
+	}
+	
+	Time opBinary(string op)(double other) const {
+		static if(op == "+"){
+			das_time dt_new = dt;
+			dt_new.seconds += other;
+			dt_norm(dt_new);
+			return Time(dt_new);
+		}
+		else static if(op == "-"){
+			das_time dt_new = dt;
+			dt_new.seconds -= other;
+			dt_norm(dt_new);
+			return Time(dt_new);
+		}
+		else static assert(false, "Operator "~op~" not implemented");
 	}
 };
