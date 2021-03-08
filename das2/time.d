@@ -117,6 +117,22 @@ struct Time{
 		if(!dt_parsetime(s.toStringz(), &dt))
 			throw new ConvException(format("Error parsing %s as a date-time", s));
 	}
+	
+	/* pull-up properties of dt to this level */
+	@property int    year()   const{ return dt.year;   }
+	@property int    month()  const{ return dt.month;  }
+	@property int    mday()   const{ return dt.mday;   }
+	@property int    yday()   const{ return dt.yday;   }
+	@property int    hour()   const{ return dt.hour;   }
+	@property int    minute() const{ return dt.minute; }
+	@property double second() const{ return dt.second; }
+
+	@property void year(int n)  { dt.year = n; }
+	@property void month(int n) { dt.month = n;}
+	@property void mday(int n)  { dt.mday = n; }
+	@property void hour(int n)  { dt.hour = n; }
+	@property void minute(int n){ dt.minute = n; }
+	@property void second(double n){ dt.second = n; }
 		
 	bool valid(){ return dt.month != 0;}
 
@@ -137,7 +153,7 @@ struct Time{
 		static if(args.length > 3) dt.hour = args[3];
 		static if(args.length > 4) dt.minute = args[4];
 		static if(args.length > 5) dt.second = args[5];
-		dt_norm(&dt);
+		dt_tnorm(&dt);
 	}
 
 	string isoc(int fracdigits) const{
@@ -146,7 +162,6 @@ struct Time{
 		return aBuf.idup[0..strlen(aBuf.ptr)];
 	}
 
-  
 	string toString() const{ return isoc(6); } 
 
 	void norm(){
