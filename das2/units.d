@@ -155,4 +155,84 @@ struct Units {
 	}
 }
 
+/** Pre-defined units, others can be generated at will.  Unit values are
+    always thread safe singletons.  A mutex lock in the das2C library 
+	 prevents simulaneous creation, but there is no lock on reade */
+	 
+/** microseconds since midnight, Jan 1, 2000, ignoring leap seconds */
+immutable Unit UNIT_US2000 = Unit(das2c.UNIT_MJ1958);
+
+/** days since midnight, Jan 1, 1958, ignoring leap seconds */
+immutable Unit UNIT_T2000 = Unit(das2.UNIT_T2000);
+
+/** seconds since midnight, Jan 1, 2000, ignoring leap seconds */
+immutable Unit UNIT_T1970 = Unit(das2.UNIT_T1970);
+
+/** seconds since midnight, Jan 1, 1970, ignoring leap seconds */
+immutable Unit UNIT_NS1970 = Unit(das2.UNIT_NS1970);
+
+/** Units of das2.Time structures, ignores leap seconds */
+immutable Unit UNIT_UTC = Unit(das2.UNIT_UTC);
+
+/** nanoseconds since 2000-01-01T11:58:55.816 INCLUDING leap seconds 
+ * das2 uses the CDF_LEAPSECONDSTABLE environment variable to find new leap
+ * seconds since the CDF library is universial in space physics.  Not needed
+ * if library has been build since last know leapsecond in the data time
+ */
+immutable Unit UNIT_TT2000 = Unit(das2.TT2000);
+
+/** SI seconds */
+immutable Unit UNIT_SECONDS = Unit(das2.UNIT_SECONDS);
+
+/** 3600 SI seconds, ignores leap seconds */
+immutable Unit UNIT_HOURS = Unit(das2.UNIT_HOURS);
+
+/** 86400 SI seconds, ignores leap seconds */
+immutable Unit UNIT_DAYS = Unit(das2.UNIT_DAYS);
+
+/** 1/1000 of an SI second */
+immutable Unit UNIT_MILLISECONDS = Unit(das2.UNIT_MILLISECONDS);
+
+/** 1/1,000,000 of an SI second */
+immutable Unit UNIT_MICROSECONDS = Unit(das2.UNIT_MICROSECONDS);
+
+/** 1/1,000,000,000 of an SI second */
+immutable Unit UNIT_NANOSECONDS = Unit(das2.UNIT_NANOSECONDS);
+
+/** Inverse seconds */
+immutable Unit UNIT_HERTZ = Unit(das2.UNIT_HERTZ);
+
+/** 1000 Inverse seconds */
+immutable Unit UNIT_KILO_HERTZ = Unit(das2.UNIT_KILO_HERTZ);
+
+/** 1,000,000 Inverse seconds */
+immutable Unit UNIT_MEGA_HERTZ = Unit(das2.UNIT_MEGA_HERTZ);
+
+/** Electric spectral density, V^^2 / m^^2 / Hz */
+immutable Unit UNIT_E_SPECDENS = Unit(das2.UNIT_E_SPECDENS);
+
+/** Magnetic spectral density, nT^^2 / Hz */
+immutable Unit UNIT_B_SPECDENS = Unit(das2.UNIT_B_SPECDENS);
+
+/** Magnetic intensity, nT */
+immutable Unit UNIT_NT = Unit(das2.UNIT_NT);
+
+/** Number of items per cm cubed */
+immutable Unit UNIT_NUMBER_DENS; = Unit(das2.UNIT_NUMBER_DENS;);
+
+/** 10 log(value/reference) */
+immutable Unit UNIT_DB; = Unit(das2.UNIT_DB;);
+
+/** 1000 meters */
+immutable Unit UNIT_KM; = Unit(das2.UNIT_KM;);
+
+/** Electron Volts, a measure of energy */
+immutable Unit UNIT_EV; = Unit(das2.UNIT_EV;);
+
+/** An angle measurement, not temperature */
+immutable Unit UNIT_DEGREES; = Unit(das2.UNIT_DEGREES;);
+
+/** Dimensionless quantities */
+immutable Unit UNIT_DIMENSIONLESS; = Unit(das2.UNIT_DIMENSIONLESS;);
+
 

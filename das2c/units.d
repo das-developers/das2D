@@ -33,6 +33,9 @@ extern __gshared const(char)* UNIT_T1970; /* seconds since midnight, Jan 1, 1970
 extern __gshared const(char)* UNIT_NS1970; /* nanoseconds since midnight, Jan 1, 1970 */
 extern __gshared const(char)* UNIT_UTC; /* Time strings on the Gregorian Calendar */
 
+/* leap second aware nanoseconds since 2000-01-01T11:58:55.816 */
+extern __gshared const(char)* UNIT_TT2000; 
+
 /* Other common units */
 extern __gshared const(char)* UNIT_SECONDS;
 extern __gshared const(char)* UNIT_HOURS;

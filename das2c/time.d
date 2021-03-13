@@ -32,7 +32,7 @@ extern (C):
 
 /** Basic date-tmodule das2c.time;
 
-ime structure used throughout the Das1 & Das2 utilities
+Time structure used throughout the Das1 & Das2 utilities
  *
  * In all das rountines, times are assumed to be UTC.  Since we are
  * dealing with spacecraft far from Earth, local time zones are of no
