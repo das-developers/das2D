@@ -160,79 +160,106 @@ struct Units {
 	 prevents simulaneous creation, but there is no lock on reade */
 	 
 /** microseconds since midnight, Jan 1, 2000, ignoring leap seconds */
-immutable Unit UNIT_US2000 = Unit(das2c.UNIT_MJ1958);
+const Units UNIT_US2000;
 
 /** days since midnight, Jan 1, 1958, ignoring leap seconds */
-immutable Unit UNIT_T2000 = Unit(das2.UNIT_T2000);
+const Units UNIT_T2000;
 
 /** seconds since midnight, Jan 1, 2000, ignoring leap seconds */
-immutable Unit UNIT_T1970 = Unit(das2.UNIT_T1970);
+const Units UNIT_T1970;
 
 /** seconds since midnight, Jan 1, 1970, ignoring leap seconds */
-immutable Unit UNIT_NS1970 = Unit(das2.UNIT_NS1970);
+const Units UNIT_NS1970;
 
 /** Units of das2.Time structures, ignores leap seconds */
-immutable Unit UNIT_UTC = Unit(das2.UNIT_UTC);
+const Units UNIT_UTC;
 
 /** nanoseconds since 2000-01-01T11:58:55.816 INCLUDING leap seconds 
  * das2 uses the CDF_LEAPSECONDSTABLE environment variable to find new leap
  * seconds since the CDF library is universial in space physics.  Not needed
  * if library has been build since last know leapsecond in the data time
  */
-immutable Unit UNIT_TT2000 = Unit(das2.TT2000);
+const Units UNIT_TT2000;
 
 /** SI seconds */
-immutable Unit UNIT_SECONDS = Unit(das2.UNIT_SECONDS);
+const Units UNIT_SECONDS;
 
 /** 3600 SI seconds, ignores leap seconds */
-immutable Unit UNIT_HOURS = Unit(das2.UNIT_HOURS);
+const Units UNIT_HOURS;
 
 /** 86400 SI seconds, ignores leap seconds */
-immutable Unit UNIT_DAYS = Unit(das2.UNIT_DAYS);
+const Units UNIT_DAYS;
 
 /** 1/1000 of an SI second */
-immutable Unit UNIT_MILLISECONDS = Unit(das2.UNIT_MILLISECONDS);
+const Units UNIT_MILLISECONDS;
 
 /** 1/1,000,000 of an SI second */
-immutable Unit UNIT_MICROSECONDS = Unit(das2.UNIT_MICROSECONDS);
+const Units UNIT_MICROSECONDS;
 
 /** 1/1,000,000,000 of an SI second */
-immutable Unit UNIT_NANOSECONDS = Unit(das2.UNIT_NANOSECONDS);
+const Units UNIT_NANOSECONDS;
 
 /** Inverse seconds */
-immutable Unit UNIT_HERTZ = Unit(das2.UNIT_HERTZ);
+const Units UNIT_HERTZ;
 
 /** 1000 Inverse seconds */
-immutable Unit UNIT_KILO_HERTZ = Unit(das2.UNIT_KILO_HERTZ);
+const Units UNIT_KILO_HERTZ;
 
 /** 1,000,000 Inverse seconds */
-immutable Unit UNIT_MEGA_HERTZ = Unit(das2.UNIT_MEGA_HERTZ);
+const Units UNIT_MEGA_HERTZ;
 
 /** Electric spectral density, V^^2 / m^^2 / Hz */
-immutable Unit UNIT_E_SPECDENS = Unit(das2.UNIT_E_SPECDENS);
+const Units UNIT_E_SPECDENS;
 
 /** Magnetic spectral density, nT^^2 / Hz */
-immutable Unit UNIT_B_SPECDENS = Unit(das2.UNIT_B_SPECDENS);
+const Units UNIT_B_SPECDENS;
 
 /** Magnetic intensity, nT */
-immutable Unit UNIT_NT = Unit(das2.UNIT_NT);
+const Units UNIT_NT;
 
 /** Number of items per cm cubed */
-immutable Unit UNIT_NUMBER_DENS; = Unit(das2.UNIT_NUMBER_DENS;);
+const Units UNIT_NUMBER_DENS;
 
 /** 10 log(value/reference) */
-immutable Unit UNIT_DB; = Unit(das2.UNIT_DB;);
+const Units UNIT_DB;
 
 /** 1000 meters */
-immutable Unit UNIT_KM; = Unit(das2.UNIT_KM;);
+const Units UNIT_KM;
 
 /** Electron Volts, a measure of energy */
-immutable Unit UNIT_EV; = Unit(das2.UNIT_EV;);
+const Units UNIT_EV;
 
 /** An angle measurement, not temperature */
-immutable Unit UNIT_DEGREES; = Unit(das2.UNIT_DEGREES;);
+const Units UNIT_DEGREES;
 
 /** Dimensionless quantities */
-immutable Unit UNIT_DIMENSIONLESS; = Unit(das2.UNIT_DIMENSIONLESS;);
+const Units UNIT_DIMENSIONLESS;
 
 
+shared static this() {
+	
+	UNIT_US2000 = Units(das2c.units.UNIT_MJ1958);
+	UNIT_T2000 = Units(das2c.units.UNIT_T2000);
+	UNIT_T1970 = Units(das2c.units.UNIT_T1970);
+	UNIT_NS1970 = Units(das2c.units.UNIT_NS1970);
+	UNIT_UTC = Units(das2c.units.UNIT_UTC);
+	UNIT_TT2000 = Units(das2c.units.UNIT_TT2000);
+	UNIT_SECONDS = Units(das2c.units.UNIT_SECONDS);
+	UNIT_HOURS = Units(das2c.units.UNIT_HOURS);
+	UNIT_DAYS = Units(das2c.units.UNIT_DAYS);
+	UNIT_MILLISECONDS = Units(das2c.units.UNIT_MILLISECONDS);
+	UNIT_MICROSECONDS = Units(das2c.units.UNIT_MICROSECONDS);
+	UNIT_NANOSECONDS = Units(das2c.units.UNIT_NANOSECONDS);
+	UNIT_HERTZ = Units(das2c.units.UNIT_HERTZ);
+	UNIT_KILO_HERTZ = Units(das2c.units.UNIT_KILO_HERTZ);
+	UNIT_MEGA_HERTZ = Units(das2c.units.UNIT_MEGA_HERTZ);
+	UNIT_E_SPECDENS = Units(das2c.units.UNIT_E_SPECDENS);
+	UNIT_B_SPECDENS = Units(das2c.units.UNIT_B_SPECDENS);
+	UNIT_NT = Units(das2c.units.UNIT_NT);
+	UNIT_NUMBER_DENS = Units(das2c.units.UNIT_NUMBER_DENS);
+	UNIT_DB = Units(das2c.units.UNIT_DB);
+	UNIT_KM = Units(das2c.units.UNIT_KM);
+	UNIT_EV = Units(das2c.units.UNIT_EV);
+	UNIT_DEGREES = Units(das2c.units.UNIT_DEGREES);
+	UNIT_DIMENSIONLESS = Units(das2c.units.UNIT_DIMENSIONLESS);
+}
