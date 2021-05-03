@@ -109,7 +109,7 @@ string rpwgString(SysTime st, int nSecPrec = 0){
  * standard D structure with functions 
  */
  
-struct Time{
+struct DasTime{
 	das_time dt = {0, 1, 1, 1, 0, 0, 0.0};
 	
 	/** Construct a time value using a string */
@@ -180,29 +180,29 @@ struct Time{
 		return aBuf.idup[0..strlen(aBuf.ptr)];
 	}
 
-	int opCmp(ref const(Time) other) const {
+	int opCmp(ref const(DasTime) other) const {
 		return dt_compare(&dt, &(other.dt));
 	}
 	
-	double opBinary(string op)(ref const(Time) other) const {
+	double opBinary(string op)(ref const(DasTime) other) const {
 		static if(op == "-"){
 			return dt_diff(&dt, &(other.dt));
 		}
 		else static assert(false, "Only subtraction is defined for two das2 times");
 	}
 	
-	Time opBinary(string op)(double other) const {
+	DasTime opBinary(string op)(double other) const {
 		static if(op == "+"){
 			das_time dt_new = dt;
 			dt_new.seconds += other;
 			dt_norm(dt_new);
-			return Time(dt_new);
+			return DasTime(dt_new);
 		}
 		else static if(op == "-"){
 			das_time dt_new = dt;
 			dt_new.seconds -= other;
 			dt_norm(dt_new);
-			return Time(dt_new);
+			return DasTime(dt_new);
 		}
 		else static assert(false, "Operator "~op~" not implemented");
 	}

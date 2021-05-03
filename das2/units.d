@@ -27,13 +27,13 @@ struct Units {
 		return to!string(du);
 	}
 	
-	Time toTime(double rTime) const {
+	DasTime toTime(double rTime) const {
 		if(!Units_haveCalRep(du)){
 			throw new ConvException(
 				format!"Units %s not convertable to a calendar time."(this)
 			);
 		}
-		Time t;
+		DasTime t;
 		Units_convertToDt(&(t.dt), rTime, du);
 		return t;
 	}
@@ -65,7 +65,7 @@ struct Units {
 	
 	/++ Encode a broken down das2 Time as an epoch time in these units 
 	 +/
-	double convert(ref const(Time) t) const {
+	double convert(ref const(DasTime) t) const {
 		return Units_convertFromDt(du, &(t.dt));
 	}
 	
@@ -171,7 +171,7 @@ const Units UNIT_T1970;
 /** seconds since midnight, Jan 1, 1970, ignoring leap seconds */
 const Units UNIT_NS1970;
 
-/** Units of das2.Time structures, ignores leap seconds */
+/** Units of das2.das_time structures, ignores leap seconds */
 const Units UNIT_UTC;
 
 /** nanoseconds since 2000-01-01T11:58:55.816 INCLUDING leap seconds 

@@ -43,8 +43,8 @@ int main(string[] args) {
 	/* Test US2000 forward transformations */
 	Units us2000 = UNIT_US2000;
 	string sTime = "2000-1-1T1:00";
-	Time dt;
-	try{ dt = Time(sTime); }
+	DasTime dt;
+	try{ dt = DasTime(sTime); }
 	catch(ConvException ex){
 		writef("ERROR: Test 2 Failed, can't parse %s as a string\n", sTime);
 		return 15;
@@ -78,7 +78,7 @@ int main(string[] args) {
 	/* Test MJ1958 units forward transformations */
 	
 	Units mj1958 = UNIT_MJ1958;
-	try{ dt = Time("2000-001T01:00"); }
+	try{ dt = DasTime("2000-001T01:00"); }
 	catch(ConvException ex){ 
 		writef("ERROR: Test 4 Failed, can't parse %s as a string\n", sTime);
 		return 15;
@@ -89,7 +89,7 @@ int main(string[] args) {
 		return 15;
 	}
 
-	try{ dt = Time("1958-01-01T13:00"); }
+	try{ dt = DasTime("1958-01-01T13:00"); }
 	catch(ConvException ex){ 
 		writef("ERROR: Test 5 Failed, can't parse %s as a string\n", sTime);
 		return 15;
@@ -124,7 +124,7 @@ int main(string[] args) {
 	
 	/* Test MJ1958 backward transformation */
 	rTime = 0.541667;
-	Time dt1 = mj1958.toTime(rTime);
+	DasTime dt1 = mj1958.toTime(rTime);
 	sBuf = dt1.isod(0);
 	if(sBuf != "1958-001T13:00:00"){
 		writef("ERROR: Test 8 Failed, %f MJ1958 is not %s UTC\n", rTime, sBuf);
