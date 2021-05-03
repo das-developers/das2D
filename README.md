@@ -88,7 +88,7 @@ entanglements by linking against the shared object `libdas2.3.so` instead of
 the static library `libdas2.3.a`.
 
 
-## Differences with das2D
+## Differences with das2C
 
 Other than being in a different language, the main usage difference between 
 das2D and [das2C](https://github.com/das-developers/das2C) is that there is no
