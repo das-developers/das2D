@@ -76,16 +76,16 @@ dmd -i -I$(DINC)  # In your project makefile
 ```
 
 Since your D program will depend on das2C and it's libraries, here's the
-rest of the command line arguments needed to link with das2C.
+rest of the command line arguments needed to link with das2C:
 
 ```bash
 dmd -i -I$(DINC) -L-L$(DAS2C_BUILD_DIR) -L-ldas2.3 -L-lexpat -L-lssl \
     -L-lcrypto -L-lfftw3 -L-lz -L-lm -L-lpthread
 ```
 
-Since this module uses the MIT license, but das2C is LGPL, you can avoid 
-avoid license entanglements by linking against the shared object `libdas2.3.so`
-instead of the static library `libdas2.3.a`.
+This module uses the MIT license, but das2C is LGPL, you can avoid license
+entanglements by linking against the shared object `libdas2.3.so` instead of
+the static library `libdas2.3.a`.
 
 
 ## Differences with das2D
