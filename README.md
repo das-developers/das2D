@@ -43,24 +43,63 @@ env LIBDAS2_PATH=$HOME/git/das2C/build.ubuntu20 dub build
 
 ## Using in Projects
 
-Das2D is mostly a source library, though small test programs are included to 
-demonstrate functionality and serve as unit tests.  The DMD command line that
-I typically use with external das2D based projects is:
+As is typical for D projects, there is no install script.  To install this
+library so that it can be used by local dub projects you can issue a
+`git clone` inside a local dub search path.  If you don't have one, the
+following command example will do the trick:
+
 ```bash
-dmd -i -I$(DAS2D_TOP_DIR) -L-L$(DAS2C_BUILD_DIR) -L-ldas2.3 -L-lexpat -L-lssl \
+dub add-local $HOME/dublocal    # For example, dublocal is not a special name
+git clone git@github.com:das-developers/das2D.git
+``` 
+
+and add it as a dependency to your `dub.json` like so:
+
+```json
+"dependencies": {
+	"das2D": "~master"
+}
+```
+
+The version ID "~master" means the top level of the master branch.  (The main
+branch of das2D will be switched to "main" at some point.)
+
+To "install" the library for non-dub pojects, copy the das2 and das2c
+directories to your favorite include path and tell dmd to autobuild any 
+reference sources.  For example:
+
+```bash
+cp -r -p das2 das2c /usr/local/voyager/include/D  # For example
+
+DINC=/usr/local/voyager/include/D
+dmd -i -I$(DINC)  # In your project makefile
+```
+
+Since your D program will depend on das2C and it's libraries, here's the
+rest of the command line arguments needed to link with das2C.
+
+```bash
+dmd -i -I$(DINC) -L-L$(DAS2C_BUILD_DIR) -L-ldas2.3 -L-lexpat -L-lssl \
     -L-lcrypto -L-lfftw3 -L-lz -L-lm -L-lpthread
 ```
-Most of the switches are used to pickup libdas2.3.so and it's dependencies.  The
-`-i` switch is important as that directs DMD to compile any imported modules. 
-Since this module uses the MIT license, but das2C is LGPL it's best to link against
-the shared object libdas2.3.so instead of libdas2.3.a to avoid license entanglements.
 
-Unlike [das2C](https://github.com/das-developers/das2C) there is no need to call:
+Since this module uses the MIT license, but das2C is LGPL, you can avoid 
+avoid license entanglements by linking against the shared object `libdas2.3.so`
+instead of the static library `libdas2.3.a`.
+
+
+## Differences with das2D
+
+Other than being in a different language, the main usage difference between 
+das2D and [das2C](https://github.com/das-developers/das2C) is that there is no
+need to explicitly initialize the library in the primary thread.
 ```
 das2_init(); // <-- not needed in D code due to module initilizers
 ```
-at the beginning of each program that uses das2D.  A `shared static this()` 
-block in the `das2/package.d` file handles runtime initialization.
+A `shared static this()` block in the `das2/package.d` file handles runtime
+initialization.
+
+Other usage differences with das2C will be noted here as needed.
 
 
 
