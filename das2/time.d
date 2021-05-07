@@ -156,7 +156,7 @@ struct DasTime{
 		dt_tnorm(&dt);
 	}
 
-	string isoc(int fracdigits) const{
+	string isoc(int fracdigits = 0) const{
 		char[64] aBuf = '\0';
 		dt_isoc(aBuf.ptr, 63, &dt, fracdigits);
 		return aBuf.idup[0..strlen(aBuf.ptr)];
