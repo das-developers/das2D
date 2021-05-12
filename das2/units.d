@@ -11,7 +11,11 @@ import das2c.time;
 
 import das2.time;
 
-/** Wrapper around das2c.das_units objects.  Ineroperable with them */
+/** Wrapper around das2c.das_units objects.  Ineroperable with them. 
+ *
+ * This object type depends on run-time initialization, thus the
+ * unittests are in the main package.d file.
+ */
 struct Units {
 	das_units du = null;
 	
@@ -162,6 +166,9 @@ struct Units {
 /** microseconds since midnight, Jan 1, 2000, ignoring leap seconds */
 const Units UNIT_US2000;
 
+/** days since midnight, Jan 1, 1958 */
+const Units UNIT_MJ1958;
+
 /** days since midnight, Jan 1, 1958, ignoring leap seconds */
 const Units UNIT_T2000;
 
@@ -236,6 +243,7 @@ const Units UNIT_DEGREES;
 const Units UNIT_DIMENSIONLESS;
 
 
+/*
 shared static this() {
 	
 	UNIT_US2000 = Units(das2c.units.UNIT_MJ1958);
@@ -263,3 +271,6 @@ shared static this() {
 	UNIT_DEGREES = Units(das2c.units.UNIT_DEGREES);
 	UNIT_DIMENSIONLESS = Units(das2c.units.UNIT_DIMENSIONLESS);
 }
+*/
+
+
