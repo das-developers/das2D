@@ -47,7 +47,7 @@ To build the documentation run the excellent
 [adrdox](https://github.com/adamdruppe/adrdox) tool on the main project area:
 
 ```bash
-cd das2d
+cd das2D
 doc2 ./
 ```
 The program 'doc2' is supplied by `adrdox`.
