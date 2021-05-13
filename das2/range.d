@@ -3,8 +3,12 @@ This module collects algoriths from various das2 programs that are more or
 less generally useful instead of duplicating these in multiple projects.
 
 The primary item defined is a `data range`.  This is the same as a regular
-range, but in addition to the .front property which provides the data 
-elements there are also the properties:
+range, but the .front function always returns a tuple or structure with at
+least the items:
+
+  .data = The "payload" for the element.  If a regular InputRange has
+          been wrapped in a DataRange, this is the .front value from
+			 the original range.
 
   .cbeg = The minimum position of a data element in coordinate space,
           Think of this as the bin minimum in other respects
@@ -14,10 +18,15 @@ elements there are also the properties:
 			
 It is okay for .cbeg = .cend
 
-Building on data ranges is a `priority range`.  In addition to coordinates
-priority ranges have a rating stating how important data from this range
-compared to similar ranges.  Priority ranges are used in select and drop
-algorithms that merge multiple input streams into a single output stream.
+Building on DataRanges are PriorityRanges.  In addition to data and 
+coordinates, the elements of this range will also have a:
+
+  .priority
+ 
+item in the output from a .front call.  The priority states how important
+data from this range compared to similar ranges.  Priority ranges are used
+in select-or-drop algorithms that merge multiple input streams into a single
+output stream.
 */
 
 module das2.range;
@@ -36,21 +45,21 @@ data range must define the primatives `empty`, `popFront`, `front` and
 ---
 static assert(isInputRange!R)
 
-auto d = r.front; // can get the data value of the range
-auto b = r.cbeg;  // can get the beginning coordinate point for the data value
-auto e = r.cend;  // can get the ending coordinate point for the data value
+auto d = r.front.data; // can get the data value of the element
+auto b = r.front.cbeg;  // can get the beginning coordinate point
+auto e = r.front.cend;  // can get the ending coordinate point
 
 // Begin and end are same types
-static assert(is( typeof(r.cbeg) == typeof(r.cend) ));
+static assert(is( typeof(r.front.cbeg) == typeof(r.front.cend) ));
 
 // Comparison operators can be used
-static assert( isOrderingComparable!typeof(r.cbeg) );
-static assert( isOrderingComparable!typeof(r.cend) );
+static assert( isOrderingComparable!typeof(r.front.cbeg) );
+static assert( isOrderingComparable!typeof(r.front.cend) );
 ---
 
 In addition the following runtime check should not throw an error
 ---
-enforce(r.cbeg <= r.cend);
+enforce(r.front.cbeg <= r.front.cend);
 ---
 
 The name "DataRange" may be a bit presumptuous as there are many types
@@ -59,8 +68,7 @@ population sizes by tagged by city name.  However, for the vast majority
 of data streams encountered in das2 work, this definition applies.
 
 This definition was selected instead of defining a basic element type
-so that coordinates could be "glued on" for any data element type if 
-desired.
+so that coordinates could be "glued on" for any standard range output.
 
 Params:
 	R = type to be tested
@@ -69,33 +77,50 @@ Returns:
 	`true` if R is a data range, `false` if not.
 */
 enum bool isDataRange(R) = isInputRange!R
-	&& is(typeof((return ref R r) => r.cbeg))
-	&& !is(ReturnType!((R r) => r.cbeg) == void)
-	&& is(typeof((return ref R r) => r.cend))
-	&& !is(ReturnType!((R r) => r.cend) == void);
+	&& is(typeof((return ref R r) => r.front.cbeg))
+	&& !is(ReturnType!((R r) => r.front.cbeg) == void)
+	&& is(typeof((return ref R r) => r.front.cend))
+	&& !is(ReturnType!((R r) => r.front.cend) == void);
 
 /**
 The coordinate of type `R`.  `R` does not have to be a range.  The coordinate
-type is determined as the type yielded by `r.coord` for an object
-`r` of type `R`. If `R` doesn't have `coord`, `CoordType!R` is `void`.
+type is determined as the type yielded by `r.front.cbeg` for an object
+`r` of type `R`. If `R` doesn't have `front`, `CoordType!R` is `void`.
 */
 template CoordType(R)
 {
 	static if ( 
-		is(typeof(R.init.cbeg.init) T) && is(typeof(R.init.cend.init) T)
+		is(typeof(R.init.front.cbeg.init) T)
+		&& is(typeof(R.init.front.cend.init) T)
+		&& is(typeof(R.init.front.cbeg.init) == typeof(R.init.front.cend.init))
 	)
 		alias CoordType = T;
 	else
 		alias CoordType = void;
 }
 
+
+/** Allows coordinate generating functions to be attached to an input range.
+ * 
+ * This is the structure created by [dataRange]
+ */
+ 
+
+struct DataElement(
+	RT, CBegF, CEndF
+){
+	const ElementType!RT data;
+	const ReturnType!CBegF cbeg;
+	const ReturnType!CEndF cend;
+}
+ 
 struct DataRange(
 	RT, CBegF, CEndF, DT=const ElementType!RT, CT=const ReturnType!CBegF
 ){
 private:
+	RT range;
 	CT function(DT) getCBeg;  // Member function
 	CT function(DT) getCEnd;  // Member function
-	RT range;
 public:
 	this(RT range, CT function(DT) getCBeg, CT function(DT) getCEnd)
 	{
@@ -104,10 +129,54 @@ public:
 		this.getCEnd = getCEnd;
 	}
 	@property bool empty() const {return range.empty; }
-	@property DT front() const {return range.front; }
-	@property CT cbeg() const {return getCBeg(range.front);}
-	@property CT cend() const {return getCEnd(range.front);}
+	@property DataElement!(RT, CBegF, CEndF) front() const {
+		return DataElement!(RT, CBegF, CEndF)(
+			range.front,
+			getCBeg(range.front),
+			getCEnd(range.front)
+		);
+	}
+	
 	void popFront(){ range.popFront(); }
+	
+	// Add save function for forward range
+	static if(isForwardRange!RT){
+		@property DataRange!(RT, CBegF, CEndF) save() {
+			return DataRange!(RT, CBegF, CEndF)(
+				range.save, getCBeg, getCEnd
+			);
+		}
+	}
+	
+	// Add back, popBack for bidirectional range
+	static if(isBidirectionalRange!RT){
+		@property DataElement!(RT, CBegF, CEndF) back() const {
+			return DataElement!(RT, CBegF, CEndF)(
+				range.back,
+				getCBeg(range.back),
+				getCEnd(range.back)
+			);
+		}
+		
+		void popBack(){ range.popBack(); }
+	}
+	
+	
+	// Add index for random access range
+	static if(isRandomAccessRange!RT){
+		DataElement!(RT, CBegF, CEndF) opIndex(size_t index) const {
+			return DataElement!(RT, CBegF, CEndF)(
+				range[index],
+				getCBeg(range[index]),
+				getCEnd(range[index])
+			);
+		}
+	}
+	
+	static if(hasLength!RT){
+		@property size_t length() const { return range.length; }
+	}
+	
 }
 
 /******************************************************************************
@@ -142,12 +211,21 @@ unittest
 		(const double[] el) => el[0] - 2.0, (const double[] el) => el[0] + 2.0
 	);
 
+	static assert( isInputRange!(typeof(dr)));
 	static assert( isDataRange!(typeof(dr)));
-
-	dr.popFront();
-		
-	assert((dr.cbeg == 18.0)&&(dr.cend == 22.0), "Algorithm test 1 failed");
-	assert(dr.front == [20, 14.0]);
+	static assert( isForwardRange!(typeof(dr)));
+	static assert( isBidirectionalRange!(typeof(dr)));
+	static assert( isRandomAccessRange!(typeof(dr)));
+	
+	auto aDr = dr.save;
+	
+	foreach(el; dr){
+		writeln("Coord: [", el.cbeg, ", ", el.cend, ")  Data: ", el.data);
+	}
+	
+	assert(aDr[3].cbeg == 38.0);
+	assert(aDr[3].cend == 42.0);
+	assert(aDr[3].data == [40.0, 15.0]);
 }
 
 
