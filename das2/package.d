@@ -9,7 +9,7 @@ import core.runtime;
 
 public import das2.units;
 public import das2.time;
-public import das2.algorithm;
+public import das2.range;
 
 immutable Units UNIT_DIMENSIONLESS;
 

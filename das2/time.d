@@ -55,6 +55,8 @@ SysTime parsetime(string s){
 /**************************************************************************
  * Get a ISO-8601 Time string to at least seconds precision.
  * Params:
+ *   st = A SysTyme object as defined in std.datetime.systime
+ *
  *   nSecPrec = The number of significant digits in the fractional seconds
  *              field.  Use 0 for whole seconds.  The maximum value is 7
  *              or 100 nanoseconds, since this is the maximum precision of

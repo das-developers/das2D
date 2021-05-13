@@ -553,7 +553,7 @@ size_t DasAry_valSize (const(DasAry)* pThis);
  * // Print the number of samples in each waveform.
  * size_t uWaveforms = DasAry_lengthIn(pWBR, DIM0);
  * for(size_t u = 0; u &lt; uWaveforms; ++u)
- *	   print("Capture %zu has %zu samples\n", u, DasAry_lengthIn(pWBR, DIM1_AT(u));
+ *	   print("Capture %zu has %zu samples\n", u, DasAry_lengthIn(pWBR, DIM1_AT(u)));
  * @endcode
  *
  * @see DasAry_getAt to obtain both the length and a pointer to a continuous

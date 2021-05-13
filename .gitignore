@@ -1,4 +1,6 @@
 build.*
 .dub
 das2_test_units
+generated-docs
+
 

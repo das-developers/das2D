@@ -25,7 +25,7 @@ extern (C):
  * Basic data storage elements
  */
 
-/** Canonical fill value (*/
+/** Canonical fill value */
 enum DAS_FILL_VALUE = -1e31;
 
 /** Conversion fill value for integer time intervals (-9.223e+18)*/

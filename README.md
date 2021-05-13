@@ -32,14 +32,26 @@ as well.
 
 ## Building
 
-You'll have to provide the location to your libdas2.3.so file using the
-`LIBDAS2_PATH` environment variable.  For example, assume you've built das2C
-in your home directory with `N_ARCH` set to `ubuntu20`, then, to build this
-modules executable you might run:
+This is a source library, so technically there is nothing to build, though 
+running the included unit tests is a good idea.  To do so you'll have to
+provide the location to your libdas2.3.so file using the `LD_LIBRARY_PATH`
+environment variable.  For example, assume you've built das2C in your home
+directory with `N_ARCH` set to `ubuntu20`, then, to build this module's
+unit tests run:
 
 ```bash
-env LIBDAS2_PATH=$HOME/git/das2C/build.ubuntu20 dub build
+env LD_LIBRARY_PATH=$HOME/git/das2C/build.ubuntu20 dub test
 ```
+
+To build the documentation run the excellent 
+[adrdox](https://github.com/adamdruppe/adrdox) tool on the main project area:
+
+```bash
+cd das2d
+doc2 ./
+```
+The program 'doc2' is supplied by `adrdox`.
+
 
 ## Using in Projects
 

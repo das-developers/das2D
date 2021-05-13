@@ -275,7 +275,7 @@ const(double)* Dft_getImg (Das2Dft* pThis, size_t* pLen);
  *
  * @param pLen The vector length.  In general this is *NOT* the same as the
  *        input time series length.  For real-value input signals (complex
- *        input is NULL, this is N/2 + 1.  For complex input signals this is N.
+ *        input is NULL), this is N/2 + 1.  For complex input signals this is N.
  *
  * @return A pointer to an internal holding bin for the real signal magnitude
  *         values.
@@ -462,7 +462,7 @@ double Psd_powerRatio (const(Das2Psd)* pThis, double* pInput, double* pOutput);
  *
  * @param pLen The vector length.  In general this is *NOT* the same as the
  *        input time series length.  For real-value input signals (complex
- *        input is NULL, this is N/2 + 1.  For complex input signals this is N.
+ *        input is NULL), this is N/2 + 1.  For complex input signals this is N.
  *
  * @return A pointer to an internal holding bin for the real signal magnitude
  *         values.

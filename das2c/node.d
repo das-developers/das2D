@@ -35,9 +35,9 @@ extern (C):
  * When describing the das2 catalog C-API there are two meanings for the word
  * Root.
  *
- * 1) Memory Roots - A node can be the in-memory root of a linked list of nodes.
+ * 1. Memory Roots - A node can be the in-memory root of a linked list of nodes.
  *
- * 2) Global Root - Root can also refer to the global das2 top-level un-named
+ * 2. Global Root - Root can also refer to the global das2 top-level un-named
  *    node which resides at http://das2.org/catalog/index.json and it's mirrors.
  *
  * Any node loaded using new_RootNode() or new_RootNode_url() is an *in memory*
@@ -70,7 +70,7 @@ extern (C):
  const char* sRelPath = "uiowa/cassini/ephemeris/saturn_sls2";
  DasNode* pNode = DasNode_subNode(pRoot, sRelPath, NULL, NULL);
 
- if(!(DasNode_isStreamSource(pNode)) handle_error();
+ if(!(DasNode_isStreamSource(pNode))) handle_error();
 
  // Get the HTTP get Query interface definition
 
