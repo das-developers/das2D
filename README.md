@@ -47,11 +47,26 @@ To build the documentation run the excellent
 [adrdox](https://github.com/adamdruppe/adrdox) tool on the main project area:
 
 ```bash
-cd das2d
+cd das2D
 doc2 ./
 ```
 The program 'doc2' is supplied by `adrdox`.
 
+## Using in D Scripts
+
+Single file D programs may be run as scripts that are compiled automatically in
+the backgroud.  The easiest way to use das2D in a script is to set the `dub`
+program as the interpreter in a shebang line.  To do so, add the following to the
+top of your D script file:
+```d
+#!/usr/bin/env dub
+/+ dub.sdl:
+    dependency "das2"  version="*"  path="/PATH/TO/das2D"
++/
+```
+and make sure das2D is on your dub search path (see below).  At present
+[a bug in dub](https://github.com/dlang/dub/issues/2123) prevents using
+an environment variable to set the path to das2D.
 
 ## Using in Projects
 
