@@ -290,22 +290,41 @@ public:
 
 private:
 	RT range;
+static if(arity!PF == 1){
 	PT function( DT ) priority; // member function pointer
+}else{
+	PT function() priority; // member function pointer
+}
 	
 public:
 
+static if(arity!PF == 1){
 	this(RT range, PT function(DT) priority){
 		this.range    = range;
 		this.priority = priority;
 	}
+}else{
+	this(RT range, PT function() priority){
+		this.range    = range;
+		this.priority = priority;
+	}
+}
+	
 
 	@property bool empty() const { return range.empty(); }
 	
 	@property OUT_T front() { 
+static if(arity!PF == 1){
 		return OUT_T(
 			range.front.data, range.front.cbeg, range.front.cend,
 			priority(range.front.data)
 		);
+}else{
+		return OUT_T(
+			range.front.data, range.front.cbeg, range.front.cend,
+			priority()
+		);
+}
 	}
 	
 	void popFront(){ range.popFront(); }
@@ -320,22 +339,41 @@ public:
 	// Add back, popBack for bidirectional range
 	static if(isBidirectionalRange!RT){
 		@property OUT_T back() {
-			return OUT_T(
-				range.back.data, range.back.cbeg, range.back.cend,
-				priority(range.back.data)
-			);
+			static if(arity!PF == 1){	
+				return OUT_T(
+					range.back.data, range.back.cbeg, range.back.cend,
+					priority(range.back.data)
+				);
+			}
+			else{
+				return OUT_T(
+					range.back.data, range.back.cbeg, range.back.cend,
+					priority()
+				);
+			}
 		}
 		void popBack(){ range.popBack(); }
 	}
 	
 	// Add index for random access range
 	static if(isRandomAccessRange!RT){
-		OUT_T opIndex(size_t index) {
-			return OUT_T(
-				range[index].data, range[index].cbeg, range[index].cend,
-				priority(range[index].data)
-			);
+		static if(arity!PF == 1){	
+			OUT_T opIndex(size_t index) {
+				return OUT_T(
+					range[index].data, range[index].cbeg, range[index].cend,
+					priority(range[index].data)
+				);
+			}
 		}
+		else{
+			OUT_T opIndex(size_t index) {
+				return OUT_T(
+					range[index].data, range[index].cbeg, range[index].cend,
+					priority()
+				);
+			}
+		}
+
 	}
 	
 	static if(hasLength!RT){
@@ -388,6 +426,64 @@ unittest
 }
 
 /******************************************************************************
+ * The range structure returned by [prioritySelect].
+ */
+struct PrioritySelect(RT)
+{
+private:
+	RT[] _ranges;  // slice of priority range objects
+	long _iReady;	// If > 0, range that will provide the next value
+	
+	// Pick an internal range object to go next, pop items to be skipped.
+	void getReady(){
+		_ranges = _ranges.filter!(rng => !rng.empty).array();
+		if(_ranges.length == 0) return;
+
+		_ranges = _ranges.sort!(
+			(rngA, rngB) => rngA.front.priority < rngB.front.priority
+		).array();
+								
+		_iReady = _ranges.minIndex!((a, b) => a.front.cbeg < b.front.cbeg);
+		
+		// Assume ranges are sorted from lowest priority to highest
+		for(long i = _iReady+1; i < _ranges.length; ++i){
+		
+			// don't overlap with higher priority items
+			if(_ranges[i].front.cbeg < _ranges[_iReady].front.cend){
+			
+				_ranges[_iReady].popFront(); // Okay if empty afterwords
+				++_iReady;
+			}
+		}
+	}
+	
+public:
+
+	alias OUT_T = ElementType!RT;
+
+	this(RT[] ranges){
+		this._ranges = ranges;
+		getReady();
+	}
+	
+	@property bool empty(){
+		// When the input ranges can no longer supply data, they are 
+		// rm'ed from the slice.
+		return (_ranges.length == 0);
+	}
+		
+   /** Ready the next element at the front. */
+	 
+	void popFront(){
+		_ranges[_iReady].popFront();
+		getReady();
+	}
+	
+	@property OUT_T front(){ return _ranges[_iReady].front; }
+}
+
+
+/******************************************************************************
  * Prority 1-D Coordinate range multiplexer
  *
  * Produces a Montonically increasing output stream of records from 1-N 
@@ -405,107 +501,77 @@ unittest
  * has data at any given coordinate point... but not alwoys, so a priority
  * scheme is used to handle the edge cases.
  *
- * Other ways to handle multiple overlapping data sources would be to average
- * measurements together in some space.
+ * Since this function climbs the priority ladder dropping all lower priority
+ * values that overlay, it is possible to drop more data than you might expect.
+ * 
+ * For the three elements below, only the highest one is emitted, even though
+ * the lowest priority item and the highest do not overlap.  Nonetheless the
+ * middle priority point acts as a bridge that get's both lower points dropped.
+ * 
+ * ```
+ *               
+ *               ^
+ *               |                   +----+----+
+ * Priority N    |                min|    |pt  |max
+ *               |                   +----+----+
+ *               |
+ *               |           +----+-----+
+ * Priority N-1  |        min|    |pt   |max
+ *               |           +----+-----+
+ *               |
+ *               |    +------+-----+
+ * Priority N-2: | min|      |pt   |max
+ *               |    +------+-----+
+ *               |
+ *               +------------------------------------->
+ *                     Increasing Coordinates
+ * ```
  *
  * Params:
- *   RT = The type of the input priority range array
- *   CT = The coordinate type producted by the PriorityRanges
- *   DT = The data type (ElementType) produced by the PriorityRanges
+ *   ranges = A set of PriorityRange objects, all of which must be of the 
+ *      same type.
+ *
+ * See Also:
+ *   [isPriorityRange] for a macro that determins if a range is a das2 priority
+ *   range.
  */
-//struct PriorityFilter(RT, CT, DT)
-//{
-//private:
-//	RT[] _ranges;  // slice of priority range objects
-//	long _iReady;	// If > 0, range that will provide the next value
-//	
-//	// Pick an internal range object to go next, pop items to be skipped.
-//	void getReady(){
-//		_ranges = _ranges.filter!(rng => !rng.empty).array();
-//		
-//		_ranges = _ranges.sort!((rngA, rngB) => rngA.priority < rngB.priority).array();
-//				
-//		if(_ranges.length == 0) return;
-//				
-//		_iReady = _ranges.minIndex!((a, b) => a.min < b.min);
-//		
-//		// Assume ranges are sorted from lowest priority to highest
-//		for(long i = _iReady+1; i < _ranges.length; ++i){
-//		
-//			// don't overlap with higher priority items
-//			if(_ranges[i].min < _ranges[_iReady].max){
-//			
-//				_ranges[_iReady].popFront(); // Okay if empty afterwords
-//				++_iReady;
-//			}
-//		}
-//	}
-//	
-//public:
-//	this(RT[] ranges){
-//		this._ranges = ranges;
-//		getReady();
-//	}
-//	
-//	@property bool empty(){
-//		// When the input ranges can no longer supply data, they are 
-//		// rm'ed from the slice.
-//		return (_ranges.length == 0);
-//	}
-//		
-//   /** Ready the next element at the front.
-//	 *
-//	 * If the min value of a higher priority point overlaps with this
-//    * point, pop it out and switch over to the higher priority item.
-//    * This can create a stair step chain like so:
-//	 * ```
-//    *               
-//    *               ^
-//    *               |                   +----+----+
-//    * Priority N    |                min|    |pt  |max
-//    *               |                   +----+----+
-//    *               |
-//    *               |           +----+-----+
-//    * Priority N-1  |        min|    |pt   |max
-//    *               |           +----+-----+
-//    *               |
-//    *               |    +-------+------+
-//    * Priority N-2: | min|       |pt    |max
-//    *               |    +-------+------+
-//    *               |
-//    *               +------------------------------------->
-//    *                     Increasing Coordinates
-//	 * ```
-//    */	 
-//	void popFront(){
-//		_ranges[_iReady].popFront();
-//		getReady();
-//	}
-//	
-//	@property DT front(){ return _ranges[_iReady].front; }
-//	@property CT min()  { return _ranges[_iReady].min; }
-//	@property CT max()  { return _ranges[_iReady].max; }
-//	@property int priority() { return _ranges[_iReady].priority;}
-//}
-//
-//PriorityFilter!(RT, CT, DT) priorityFilter(
-//	RT, CT=CoordType!RT, DT=ElementType!RT
-//)(
-//	RT[] ranges
-//){
-//	return PriorityFilter!(RT, CT, DT)(ranges);
-//}
-//
-//unittest{
-//	auto pr1 = iota(20, 40, 2).priorityRange(5, 1);  // Fine data
-//	auto pr2 = iota(0, 100, 10).priorityRange(2, 5); // Coarse data
-//	
-//	auto fltr = [pr1, pr2].priorityFilter();
-//	
-//	foreach(el; fltr){
-//		auto val = fltr.priority;
-//		writefln("priority: %s, value: %s", val, el);
-//	}
-//}
+PrioritySelect!RT prioritySelect(RT)(RT[] ranges){
+	return PrioritySelect!RT(ranges);
+}
+
+unittest{
+	import std.random;
+	
+	auto fine_recs = zip(
+		iota(20, 40, 2), generate!(() => uniform(0, 128))
+	).array;
+	
+	auto course_recs = zip(
+		iota(0, 100, 10), generate!(() => uniform(0, 128))
+	).array;
+		
+	alias ET = ElementType!(typeof(fine_recs));
+		
+	auto dr_fine = fine_recs
+		.dasRange((ET el) => el[0] - 2, (ET el) => el[0] + 2) // get coords
+		.priorityRange( () => 2 );     // higher priority
+		
+	auto dr_course = course_recs
+		.dasRange((ET el) => el[0] - 5, (ET el) => el[0] + 5) // get coords
+		.priorityRange( () => 1 );     // lower priority
+	
+	auto pr = prioritySelect([dr_fine, dr_course]);
+	
+	foreach(el; pr){
+		write(
+			"Priority: ", el.priority, "  Coord: [", el.cbeg, ", ", el.cend, ")",
+			"  Data: "
+		);
+		foreach(i, member; el.data)
+			if(i > 0) write(", ", member);
+			else write(member);
+		write("\n");
+	}
+}
 
 
