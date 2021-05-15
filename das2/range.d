@@ -35,17 +35,23 @@ import std.algorithm;
 import std.range;
 import std.stdio;
 import std.traits;
+import std.typecons;
 
-/**
-Returns `true` if `R` is a data range.  Data ranges are just input ranges
-that also supply a orderable coordinate value for each front value.  A
-data range must define the primatives `empty`, `popFront`, `front` and
-`coord`.  The following code should compile for any data range.
+/** Test for das2 ranges
 
+This is a templated variable evaluates to `true` if type `R` is a das2
+range.  Das2 ranges are just standard phobos ranges with:
+
+ * Tuples for range elements
+ * A sub-element 'data' is present in the tuple elements.
+ * The sub-elements `cbeg` and `cend` are present in the range element.
+ * The sub-elements `cbed` and `cend` are orderable via `<`.
+
+The follow code should compile for any data range.
 ---
-static assert(isInputRange!R)
+static assert(isInputRange!R);
 
-auto d = r.front.data; // can get the data value of the element
+auto b = r.front.data;  // can get the data "payload"
 auto b = r.front.cbeg;  // can get the beginning coordinate point
 auto e = r.front.cend;  // can get the ending coordinate point
 
@@ -62,113 +68,85 @@ In addition the following runtime check should not throw an error
 enforce(r.front.cbeg <= r.front.cend);
 ---
 
-The name "DataRange" may be a bit presumptuous as there are many types
-data ranges that could not meet this definition, such as a stream of
-population sizes by tagged by city name.  However, for the vast majority
-of data streams encountered in das2 work, this definition applies.
-
-This definition was selected instead of defining a basic element type
-so that coordinates could be "glued on" for any standard range output.
-
 Params:
 	R = type to be tested
 	
 Returns:
 	`true` if R is a data range, `false` if not.
+
 */
-enum bool isDataRange(R) = isInputRange!R
+enum bool isDasRange(R) = isInputRange!R
+	&& isTuple!(ReturnType!((R r) => r.front))
+	&& is(typeof((return ref R r) => r.front.data))
+	&& !is(ReturnType!((R r) => r.front.data) == void)
 	&& is(typeof((return ref R r) => r.front.cbeg))
 	&& !is(ReturnType!((R r) => r.front.cbeg) == void)
+	&& isOrderingComparable!(typeof((return ref R r) => r.front.cbeg))
 	&& is(typeof((return ref R r) => r.front.cend))
-	&& !is(ReturnType!((R r) => r.front.cend) == void);
+	&& !is(ReturnType!((R r) => r.front.cend) == void)
+	&& isOrderingComparable!(typeof((return ref R r) => r.front.cend));
 
-/**
-The coordinate of type `R`.  `R` does not have to be a range.  The coordinate
-type is determined as the type yielded by `r.front.cbeg` for an object
-`r` of type `R`. If `R` doesn't have `front`, `CoordType!R` is `void`.
-*/
-template CoordType(R)
-{
-	static if ( 
-		is(typeof(R.init.front.cbeg.init) T)
-		&& is(typeof(R.init.front.cend.init) T)
-		&& is(typeof(R.init.front.cbeg.init) == typeof(R.init.front.cend.init))
-	)
-		alias CoordType = T;
-	else
-		alias CoordType = void;
-}
-
-
-/** Allows coordinate generating functions to be attached to an input range.
+/******************************************************************************
+ * One possible DasRange template.
+ *
+ * This is the range structure emitted by [dasRange] see that function
+ * for more details.
  * 
- * This is the structure created by [dataRange]
- */
- 
-
-struct DataElement(
-	RT, CBegF, CEndF
-){
-	const ElementType!RT data;
-	const ReturnType!CBegF cbeg;
-	const ReturnType!CEndF cend;
-}
- 
-struct DataRange(
-	RT, CBegF, CEndF, DT=const ElementType!RT, CT=const ReturnType!CBegF
+ * Params:
+ *   RT = The input range type should be some Phobos input range.
+ *   BF = The type of function that produces coordinate begin values
+ *        the upstream elements.
+ *   EF = The type of function that produces coordinate ending values
+ *        from the upstream elements.
+ */ 
+struct DasRange(
+	RT, BF, EF, IN_T=ElementType!RT, CT=ReturnType!BF
 ){
 private:
 	RT range;
-	CT function(DT) getCBeg;  // Member function
-	CT function(DT) getCEnd;  // Member function
+	CT function(IN_T) getBeg;  // Member function pointer
+	CT function(IN_T) getEnd;  // Member function pointer
 public:
-	this(RT range, CT function(DT) getCBeg, CT function(DT) getCEnd)
+	
+	// Define the output type tuple
+	alias OUT_T = Tuple!(IN_T, "data", CT, "cbeg", CT, "cend");
+
+	this(RT range, CT function(IN_T) getCBeg, CT function(IN_T) getCEnd)
 	{
 		this.range = range;
-		this.getCBeg = getCBeg;
-		this.getCEnd = getCEnd;
-	}
-	@property bool empty() const {return range.empty; }
-	@property DataElement!(RT, CBegF, CEndF) front() const {
-		return DataElement!(RT, CBegF, CEndF)(
-			range.front,
-			getCBeg(range.front),
-			getCEnd(range.front)
-		);
+		this.getBeg = getCBeg;
+		this.getEnd = getCEnd;
 	}
 	
 	void popFront(){ range.popFront(); }
+
+	@property bool empty() const {return range.empty; }
 	
+	@property OUT_T front() {
+		return OUT_T(range.front, getBeg(range.front), getEnd(range.front));
+	}
+		
 	// Add save function for forward range
 	static if(isForwardRange!RT){
-		@property DataRange!(RT, CBegF, CEndF) save() {
-			return DataRange!(RT, CBegF, CEndF)(
-				range.save, getCBeg, getCEnd
-			);
+		@property DasRange!(RT, BF, EF) save() {
+			return DasRange!(RT, BF, EF)(range.save, getBeg, getEnd);
 		}
 	}
 	
 	// Add back, popBack for bidirectional range
 	static if(isBidirectionalRange!RT){
-		@property DataElement!(RT, CBegF, CEndF) back() const {
-			return DataElement!(RT, CBegF, CEndF)(
-				range.back,
-				getCBeg(range.back),
-				getCEnd(range.back)
-			);
+		@property OUT_T back() {
+			return OUT_T(range.back, getBeg(range.back), getEnd(range.back));
 		}
-		
 		void popBack(){ range.popBack(); }
 	}
 	
 	
 	// Add index for random access range
 	static if(isRandomAccessRange!RT){
-		DataElement!(RT, CBegF, CEndF) opIndex(size_t index) const {
-			return DataElement!(RT, CBegF, CEndF)(
-				range[index],
-				getCBeg(range[index]),
-				getCEnd(range[index])
+		OUT_T opIndex(size_t index) {
+			return OUT_T(
+				range[index], getBeg(range[index]), getEnd(range[index])
 			);
 		}
 	}
@@ -176,27 +154,33 @@ public:
 	static if(hasLength!RT){
 		@property size_t length() const { return range.length; }
 	}
-	
 }
 
 /******************************************************************************
- * Adaptor for converting input ranges into data ranges
- *
- * Template:
- *  * RT = The type of range to wrap
- *  * CBegF = Function for producing coordinate minimum from each element of RT
- *  * CEndF = Function for producing coordinate maximum from each element of RT 
+ * Adaptor for converting input ranges into coordinate + data ranges
  *
  * Params:
- *    range = The InputRange to wrap as a DataRange
- *    fBeg  = Function that extracts the beginning coordinate for
- *            each data element from range.front
- *    fEnd  = Function that extracts the ending 
+ *    range = The InputRange to wrap as a DataRange. Range properties are 
+ *            preservend.  So, if the input range type is also a FrontRange, 
+ *            BidirectionRange, or RandomAccessRange then the returned structure
+ *            will also be one too.
+ * 
+ *    fBeg  = Function that extracts the beginning coordinate for each data
+ *            element from range.front
+ *
+ *    fEnd  = Function that extracts the ending coordinate for each data 
+ *            element form range.front
+ * 
+ * Returns:
+ *    A [DasRange] structure.  The returned range object will also be a
+ *    FrontRange, BidirectionalRange, or RandomAccessRange depending on
+ *    the input range.
+ *    
  */
-DataRange!(RT, CBegF, CEndF) dataRange(RT, CBegF, CEndF)(
-	RT range, CBegF fBeg, CEndF fEnd
+DasRange!(RT, CBegF, EF) dasRange(RT, CBegF, EF)(
+	RT range, CBegF fBeg, EF fEnd
 ){
-	return DataRange!(RT, CBegF, CEndF)(range, fBeg, fEnd);
+	return DasRange!(RT, CBegF, EF)(range, fBeg, fEnd);
 }
 
 ///
@@ -207,54 +191,46 @@ unittest
 	];
 	
 	// Provide rules for digging coordinates out of the packets 
-	auto dr = packets.dataRange(
-		(const double[] el) => el[0] - 2.0, (const double[] el) => el[0] + 2.0
+	auto dr = packets.dasRange(
+		(double[] el) => el[0] - 2.0, (double[] el) => el[0] + 2.0
 	);
 
 	static assert( isInputRange!(typeof(dr)));
-	static assert( isDataRange!(typeof(dr)));
+	static assert( isDasRange!(typeof(dr)));
 	static assert( isForwardRange!(typeof(dr)));
 	static assert( isBidirectionalRange!(typeof(dr)));
 	static assert( isRandomAccessRange!(typeof(dr)));
 	
-	auto aDr = dr.save;
+	auto dr_backup = dr.save;
 	
 	foreach(el; dr){
 		writeln("Coord: [", el.cbeg, ", ", el.cend, ")  Data: ", el.data);
 	}
 	
-	assert(aDr[3].cbeg == 38.0);
-	assert(aDr[3].cend == 42.0);
-	assert(aDr[3].data == [40.0, 15.0]);
+	assert(dr_backup[3].cbeg == 38.0);
+	assert(dr_backup[3].cend == 42.0);
+	assert(dr_backup[3].data == [40.0, 15.0]);
 }
 
 
-// NOTE: "///" is an obtuse was to say add this unittest as an example to the
-// previous item. 
+/** Test for das priority ranges
 
-/**
-Returns `true` if `R` is a priority range.  Priority ranges are just data
-ranges that also supply the priority of the current data item, *and* produce
-Monotonic data.
+This is a templated variable that evaluates to `true` if type `R` is a 
+das priority range.  Das priority ranges are das ranges with a priority 
+attribute in each element.
 
-In addition to the operations for data ranges, the following code should
-compile for all priority ranges.
+ * Tuples for range elements
+ * The sub-element `priority` must be present in each range element.
+ * The sub-elemens `.priority` should be compariable via `<` and `==`.
+ 
+The priority elemens of a range can be a constant value for the whole
+range.
 
+The follow code should compile for any priority range.
 ---
-static assert( isDataRange!R);
+static assert(isDasRange!R)
 
-auto p = r.priority; // can get the priority value of the front object.
----
-
-A priority range must be monotonic increasing, so the following run-time
-check should always succeed.
----
-auto last = r.cbeg;
-r.popFront();
-for(auto cur = r.cbeg; !r.empty; r.popFront()){
-	enforce(cur >= last);
-	last = cur;
-}
+auto b = r.front.priority;  // can get the priority value
 ---
 
 Params:
@@ -263,118 +239,153 @@ Params:
 Returns:
 	`true` if R is a priority range, `false` if not.
 */
-enum bool isPriorityRange(R) = isDataRange!R
-	&& is(typeof((return ref R r) => r.priority))
-	&& !is(ReturnType!((R r) => r.cbeg) == void);
+enum bool isPriorityRange(R) = isDasRange!R
+	&& is(typeof((return ref R r) => r.front.priority))
+	&& !is(ReturnType!((R r) => r.front.priority) == void)
+	&& isOrderingComparable!(typeof((return ref R r) => r.front.priority));
+
+
+/**
+The coordinate of type `R`.  `R` does not have to be a range.  The coordinate
+type is determined as the type yielded by `r.front.cbeg` for an object
+`r` of type `R`. If `R` doesn't have `front`, `CoordType!R` is `void`.
+*/
+//template CoordType(R)
+//{
+//	static if ( 
+//		is(typeof(R.init.front.cbeg.init) T)
+//		&& is(typeof(R.init.front.cend.init) T)
+//		&& is(typeof(R.init.front.cbeg.init) == typeof(R.init.front.cend.init))
+//	)
+//		alias CoordType = T;
+//	else
+//		alias CoordType = void;
+//}
 
 
 /***************************************************************************
- * Adaptor for converting data ranges into priority ranges
+ * Adaptor for adding priorities to das ranges
  *
  * Params:
- *   RT = The type of range to wrap
- *   CT = The coordinate type produced by the range
- *   DT = The data type produced by the range (same as ElementType)
+ *   RT = The type of das range to wrap
+ *   PF = The type of function providing priority measures
  */
-//struct PriorityRange(RT, CT, DT) {
-//	RT range;
-//	CT spread;
-//	int priority; // automatically a property
-//	
-//	/** Construct a priority range from a standard input range.
-//	 * Params:
-//	 *   range = An InputRange object whose elements are comparable via
-//	 *       the "<" operator.
-//	 * 
-//	 *   spread = Increase the "owned" coordinate area by this amount. In the
-//	 *       PriorityFilter algorithm, lower priority points that overlap 
-//	 *       higher priority points are dropped from the output stream.  In
-//	 *       order to determin overlap, each point must be spread out in
-//	 *       coordinate space.  The min and max values for each front record
-//	 *       will be dermined by:
-//	 *       '''
-//	 *       min = front - spread;
-//	 *       max = front + spread;
-//	 *       ''' 
-//	 *
-//	 *   priority = An integer rating of the priority, higer values take
-//	 *       precidence over lower values.
-//	 */
-//	this(RT range, int priority, CT spread){
-//		this.range    = range;
-//		this.spread   = spread;
-//		this.priority = priority;
-//	}
-//
-//	/** Determine if calling popFront will provide any new elements.
-//	 * Standard InputRange property. */	
-//	@property bool empty() const { return range.empty(); }
-//	
-//	/** Get the front element of the range
-//	 * Standard InputRange property
-//	 */
-//	@property DT front() const   { return range.front; }
-//	
-//	/** The lower bound of the owned coordinate space for the front record.
-//	 * This is a standard ProrityRange property which is equal to:
-//	 * ```
-//	 * front - spread
-//	 * ```
-//	 */
-//	@property CT min() const     { return range.front - spread; }
-//	
-//	/** The upper bound of the owned coordinate space for the front record.
-//	 * This is a standard ProrityRange property which is equal to:
-//	 * ```
-//	 * front + spread
-//	 * ```
-//	 */	
-//	@property CT max() const     { return range.front + spread; }
-//	
-//	/** Mave the next element of the range into the .front property
-//	 * Standard InputRange function */
-//	void popFront(){ range.popFront(); }
-//}
-//
-///** Convenience for adapting InputRanges to PriorityRanges  
-// *
-// * See the documentation for the PriorityRange constructor.
-// * '''
-// * auto stream1 = iota(100.0, 400.0, 10.0).priorityRange(1, 5.0);
-// * auto stream2 = iota(100.0, 400.0, 20.0).priorityRange(2, 10.0);
-// * '''
-// */
-//PriorityRange!(RT, ET) priority(RT, ET = ElementType!RT)(
-//	RT range, int priority, ET spread
-//){
-//	return PriorityRange!(RT, ET)(range, priority, spread);
-//}
-//
-//unittest
-//{
-//	double[][] packets = [ 
-//		[10.0, 13.0 ], [20, 14.0], [30, 17.0], [40, 15.0]
-//	];
-//	
-//	
-//	file.byline.dataRange().priorityRange(5);
-//	
-//	// Create a priority range by wrapping the array in data range
-//	// and then wrapping the data range as a priority range, with a fixed
-//	// priority value of 5.
-//		
-//	auto pr = packets
-//		.coordinates!(el => el[0] - 2.0, el => el[0] + 2.0)
-//		.priority(5);
-//
-//	pr.popFront();
-//	
-//	auto tEl = pr.front;
-//	
-//	assert((tEl.cbeg == 108.0)&&(tEl.cend == 112.0), "Algorithm test 1 failed");
-//	assert(tEl.priority == 5, "Algorithm test 2 failed"); 
-//	assert(tEl.data = [20, 14.0]);
-//}
+ 
+
+struct PriorityRange(RT, PF)
+
+if( isDasRange!RT){ // Expects a type of dasRange for the input
+
+public:
+	alias IN_T = ElementType!RT; // The input range type
+	
+	alias DT   = typeof(IN_T.data); // The input data
+	
+	alias CT   = typeof(IN_T.cbeg); // The input coordinates
+	
+	alias PT   = ReturnType!PF;  // The type of priority to store
+	
+	// The output range type
+	alias OUT_T = Tuple!(DT, "data", CT, "cbeg", CT, "cend", PT, "priority");
+
+private:
+	RT range;
+	PT function( DT ) priority; // member function pointer
+	
+public:
+
+	this(RT range, PT function(DT) priority){
+		this.range    = range;
+		this.priority = priority;
+	}
+
+	@property bool empty() const { return range.empty(); }
+	
+	@property OUT_T front() { 
+		return OUT_T(
+			range.front.data, range.front.cbeg, range.front.cend,
+			priority(range.front.data)
+		);
+	}
+	
+	void popFront(){ range.popFront(); }
+	
+	// Add save function for forward range
+	static if(isForwardRange!RT){
+		@property PriorityRange!(RT, PF) save() {
+			return PriorityRange!(RT, PF)(range.save, priority);
+		}
+	}
+	
+	// Add back, popBack for bidirectional range
+	static if(isBidirectionalRange!RT){
+		@property OUT_T back() {
+			return OUT_T(
+				range.back.data, range.back.cbeg, range.back.cend,
+				priority(range.back.data)
+			);
+		}
+		void popBack(){ range.popBack(); }
+	}
+	
+	// Add index for random access range
+	static if(isRandomAccessRange!RT){
+		OUT_T opIndex(size_t index) {
+			return OUT_T(
+				range[index].data, range[index].cbeg, range[index].cend,
+				priority(range[index].data)
+			);
+		}
+	}
+	
+	static if(hasLength!RT){
+		@property size_t length() const { return range.length; }
+	}
+}
+
+//enum Tuple!(RT, BF, EF)
+
+/** Wrap a das range as a das priority range
+ *
+ * Params:
+ *   range = A das range 
+ * 
+ *   priority = A function which produces priority values for each das
+ *     range element.
+ *
+ */
+PriorityRange!(RT, PF) priorityRange(RT, PF)(RT range, PF priority)
+{
+	return PriorityRange!(RT, PF)(range, priority);
+}
+
+unittest
+{
+	double[][] packets = [ 
+		[10.0, 13.0, 3.0], [20, 14.0, 2.0], [30, 17.0, 1.0], [40, 15.0, 5.0]
+	];
+	
+	// Functions for pulling values from the data packets
+	alias coord0   = (double[] el) => el[0] - 2.0;
+	alias coord1   = (double[] el) => el[0] + 2.0;
+	alias priority = (double[] el) => el[2]      ;
+	
+	auto pr = packets
+		.dasRange(coord0, coord1)  // Converts elements to .data .cbeg .cend
+		.priorityRange(priority);  // adds .priority element
+
+	static assert( isRandomAccessRange!(typeof(pr)) );
+	static assert( isDasRange!(typeof(pr)) );
+	static assert( isPriorityRange!(typeof(pr)) );
+
+	auto sorted = pr.array.sort!"a.priority < b.priority";
+				
+	foreach(el; sorted)
+		writeln(
+			"Coord: [", el.cbeg, ", ", el.cend, ")   Priority: ", el.priority,
+			" Data: ", el.data
+		);	
+}
 
 /******************************************************************************
  * Prority 1-D Coordinate range multiplexer
@@ -496,3 +507,5 @@ enum bool isPriorityRange(R) = isDataRange!R
 //		writefln("priority: %s, value: %s", val, el);
 //	}
 //}
+
+
