@@ -548,9 +548,14 @@ unittest{
    // In a real program, records would be gathered from a file or from
    // some other source.
    auto fine_recs = zip(iota(20, 40, 2), generate!(() => uniform(0, 128))).array;
-
+	
    // Generate an array of low-resolution records (spaced 10 apart)
    auto coarse_recs = zip(iota(0, 100, 10), generate!(() => uniform(0, 128))).array;
+	
+   // Blows up if .array is missing.  Comment out equivalent definitions above
+	// and uncomment lines below for an "interesting" dmd message.
+// auto fine_recs   = zip(iota(20, 40,  2), generate!(() => uniform(0, 128)));
+// auto coarse_recs = zip(iota(0, 100, 10), generate!(() => uniform(0, 128)));
 
    // Common element type for both datasets
    alias ET = ElementType!(typeof(fine_recs));
