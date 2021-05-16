@@ -120,7 +120,7 @@ public:
 	
 	void popFront(){ range.popFront(); }
 
-	@property bool empty() const {return range.empty; }
+	@property bool empty() {return range.empty; }
 	
 	@property OUT_T front() {
 		return OUT_T(range.front, getBeg(range.front), getEnd(range.front));
@@ -152,7 +152,7 @@ public:
 	}
 	
 	static if(hasLength!RT){
-		@property size_t length() const { return range.length; }
+		@property size_t length() { return range.length; }
 	}
 }
 
@@ -311,7 +311,7 @@ static if(arity!PF == 1){
 }
 	
 
-	@property bool empty() const { return range.empty(); }
+	@property bool empty() { return range.empty(); }
 	
 	@property OUT_T front() { 
 static if(arity!PF == 1){
@@ -377,7 +377,7 @@ static if(arity!PF == 1){
 	}
 	
 	static if(hasLength!RT){
-		@property size_t length() const { return range.length; }
+		@property size_t length() { return range.length; }
 	}
 }
 
@@ -460,6 +460,7 @@ private:
 public:
 
 	alias OUT_T = ElementType!RT;
+	static assert(!is(OUT_T == void), "Common type not found for input ranges");
 
 	this(RT[] ranges){
 		this._ranges = ranges;
@@ -528,50 +529,57 @@ public:
  * ```
  *
  * Params:
- *   ranges = A set of PriorityRange objects, all of which must be of the 
- *      same type.
+ *   ranges = A slice of PriorityRange objects.  Since this is a slice all of
+ *      the range objects must be of the same type.
  *
  * See Also:
  *   [isPriorityRange] for a macro that determins if a range is a das2 priority
  *   range.
  */
-PrioritySelect!RT prioritySelect(RT)(RT[] ranges){
+PrioritySelect!(RT) prioritySelect(RT)(RT[] ranges){
 	return PrioritySelect!RT(ranges);
 }
 
+///
 unittest{
-	import std.random;
-	
-	auto fine_recs = zip(
-		iota(20, 40, 2), generate!(() => uniform(0, 128))
-	).array;
-	
-	auto course_recs = zip(
-		iota(0, 100, 10), generate!(() => uniform(0, 128))
-	).array;
-		
-	alias ET = ElementType!(typeof(fine_recs));
-		
-	auto dr_fine = fine_recs
-		.dasRange((ET el) => el[0] - 2, (ET el) => el[0] + 2) // get coords
-		.priorityRange( () => 2 );     // higher priority
-		
-	auto dr_course = course_recs
-		.dasRange((ET el) => el[0] - 5, (ET el) => el[0] + 5) // get coords
-		.priorityRange( () => 1 );     // lower priority
-	
-	auto pr = prioritySelect([dr_fine, dr_course]);
-	
-	foreach(el; pr){
-		write(
-			"Priority: ", el.priority, "  Coord: [", el.cbeg, ", ", el.cend, ")",
-			"  Data: "
-		);
-		foreach(i, member; el.data)
-			if(i > 0) write(", ", member);
-			else write(member);
-		write("\n");
-	}
+   import std.random;
+
+   // Generate an array of high-resolution records (spaced 2 apart)
+   // In a real program, records would be gathered from a file or from
+   // some other source.
+   auto fine_recs = zip(iota(20, 40, 2), generate!(() => uniform(0, 128))).array;
+
+   // Generate an array of low-resolution records (spaced 10 apart)
+   auto coarse_recs = zip(iota(0, 100, 10), generate!(() => uniform(0, 128))).array;
+
+   // Common element type for both datasets
+   alias ET = ElementType!(typeof(fine_recs));
+
+   // Wrap the records as a DasRange, and then a PriorityRange
+   // Lambda function arguments to dasRange get coordiantes from the records.
+   // Lambda functions arguments to priorityRange provide priority values.
+   auto dr_fine = fine_recs
+      .dasRange((ET el) => el[0] - 2, (ET el) => el[0] + 2) // get coords
+      .priorityRange( () => 2 );     // higher priority
+
+   auto dr_coarse = coarse_recs
+      .dasRange((ET el) => el[0] - 5, (ET el) => el[0] + 5) // get coords
+      .priorityRange( () => 1 );     // lower priority
+
+   // Wrap both ranges as a proritySelect range, lower priority items
+   // from the input ranges will be dropped if thier coordinates overlap
+   // higher priority records
+   auto pr = prioritySelect([dr_fine, dr_coarse]);
+
+   // Print the resulting stream
+   foreach(el; pr){
+      write(
+         "Priority: ", el.priority, "  Coord: [", el.cbeg, ", ", el.cend, ")",
+         "  Data: "
+      );
+      foreach(i, member; el.data)
+         if(i > 0) write(", ", member);
+         else write(member);
+      write("\n");
+   }
 }
-
-
