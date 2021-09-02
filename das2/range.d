@@ -202,11 +202,8 @@ unittest {
 
 	InputRange!record_t oF = inputRangeObject(fine_recs);
 	InputRange!record_t oC = inputRangeObject(coarse_recs);
-	InputRange!record_t[] ary = [oF, oC];
-	
-	PrioritySelect!(record_t) rP = prioritySelect([oF, oC]);
-	
-   foreach(el; rP){  // print merged stream
+		
+   foreach(el; prioritySelect([oF, oC])){  // print merged stream
       write(
          "Priority: ", el.priority, "  Coord: [", el.cbeg, ", ", el.cend, ")",
          "  Data: "
@@ -279,6 +276,6 @@ unittest {
  *   range.
  */
  
-PrioritySelect!(REC_T) prioritySelect(REC_T)(InputRange!REC_T[] ranges){
-	return PrioritySelect!(REC_T)(ranges);
+InputRange!(REC_T) prioritySelect(REC_T)(InputRange!REC_T[] ranges){
+	return inputRangeObject(PrioritySelect!(REC_T)(ranges));
 }

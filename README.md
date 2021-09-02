@@ -19,12 +19,11 @@ To use the library add:
 ```d
 import das2;
 ```
-To your modules.  Since the higher level functions are being created as needed
-it may also be necessary to add:
+To your modules.  The following import will provide access to the lower level
+C functions.
 ```d
 import das2c;
 ```
-as well.
 
 
 ## Building
@@ -74,6 +73,7 @@ following command example will do the trick:
 
 ```bash
 dub add-local $HOME/dublocal    # For example, dublocal is not a special name
+cd $HOME/dublocal
 git clone git@github.com:das-developers/das2D.git
 ``` 
 
@@ -81,16 +81,16 @@ and add it as a dependency to your `dub.json` like so:
 
 ```json
 "dependencies": {
-	"das2D": "~master"
+   "das2D": "~master"
 }
 ```
 
-The version ID "~master" means the top level of the master branch.  (The main
-branch of das2D will be switched to "main" at some point.)
+The version ID "~master" means the top level of the master branch.  (The 
+master branch of das2D will be switched to the name "main" at some point.)
 
 To "install" the library for non-dub pojects, copy the das2 and das2c
 directories to your favorite include path and tell dmd to autobuild any 
-reference sources.  For example:
+referenced sources.  For example:
 
 ```bash
 cp -r -p das2 das2c /usr/local/voyager/include/D  # For example
