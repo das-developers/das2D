@@ -2,6 +2,9 @@
 	"authors": [
 		"Chris Piker"
 	],
+	"dependencies": {
+		"dxml": "*"
+	},
 	"description": "D bindings for the das2 C library",
 	"authors": ["Chris Piker"],
 	"license": "MIT",
