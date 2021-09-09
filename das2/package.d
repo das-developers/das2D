@@ -10,6 +10,7 @@ import core.runtime;
 public import das2.units;
 public import das2.time;
 public import das2.range;
+public import das2.stream;
 
 immutable Units UNIT_DIMENSIONLESS;
 

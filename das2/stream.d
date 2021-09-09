@@ -11,11 +11,16 @@ import std.algorithm: filter;
 import std.format : format;
 import std.system; // Endian, OS
 import std.conv : to;
+import std.typecons: Tuple;
+import std.algorithm: find;
 
 import das2.time;
 import das2.units;
 import das2c.tt2000: das_tt2K_to_utc;
 
+alias XmlStream = EntityRange!(simpleXML, const(char)[]);
+
+/* ************************************************************************* */
 class DasTypeException : Exception
 {
 package: // Only stuff in the das2 package can throw these
@@ -23,6 +28,15 @@ package: // Only stuff in the das2 package can throw these
 		super(format("[%s,%s] %s", file, line, msg));
 	}
 }
+class DasStreamException : Exception
+{
+package: // Only stuff in the das2 package can throw these
+this(	string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
+		super(format("[%s,%s] %s", file, line, msg));
+	}
+}
+
+/* ************************************************************************* */
 
 enum PropType {TIME, STR, DATUM, DATUM_RNG, ORD, REAL};
 
@@ -34,6 +48,8 @@ struct PktProp{
 	PropType type = PropType.STR;
 	string value;
 }
+
+/* ************************************************************************* */
 
 struct PktAry{
 private:
@@ -176,6 +192,8 @@ public:
 	}
 }
 
+/* ************************************************************************* */
+
 struct PktDim {
 	PktProp[string] props;
 	PktAry[string] arrays;
@@ -184,31 +202,73 @@ struct PktDim {
 	}
 }
 
+/* ************************************************************************* */
+
 struct DasPkt {
 	PktDim[string] dims;
+
+package:
+	this(XmlStream)
+	{
+
+	}
+
+	// Initialize PktDim objects using sections of the data
+	void setData(const(ubyte)[] _data)
+	{
+
+	}
+
 	ref PktAry opIndex(string sDim, string sUsage="center")
 	{
 		return dims[sDim][sUsage];
 	}
 }
 
-/* Move to das2, range.d */
+/* ************************************************************************* */
 class InputPktRange{
-private:
+package:
+
+	alias PktTag = Tuple!(int, "id", char, "type");
+
 	const char[] _data;
 	MmFile _mmfile;
+
+	// Only support XML tag types for now, others can be added as needed
 	//enum TagType {binary_fixed, binary_var, xml};
 	//TagType _tagtype;
 	
-	EntityRange!(simpleXML, const(char)[]) _rEntity;
+	XmlStream _rXml;
 	
 	PktProp[string] _props;
-	DasPkt _pkt;
+	DasPkt[int] _pkts;  // Not an array, a map
+	int _curPktId = -1;
+	string _source;     // Save the data source for error reports
+
+	PktTag getPktId(XmlStream rXml){
+
+		if(_rXml.front.name == "h" || _rXml.front.name == "d"){
+			auto attr = find!(a=> (a.name == "id"))(_rXml.front.attributes);
+			if(attr.empty){
+				throw new DasStreamException(format(
+					"[%s:%d] The 'id' attribute is missing from the XML header"~
+					"packet container", _source, _rXml.front.pos.line
+				));
+			}
+			return PktTag(to!int(attr.front.value), _rXml.front.name[0]);
+		}
+		
+		// Wierd stuff 
+		throw new DasStreamException(format(
+			"[%s:%d] Unknown packet tag element '%s'",
+			_source, _rXml.front.pos.line, _rXml.front.name
+		));
+	}
 
 public:
 	this(string sSource){
-
-		_mmfile = new MmFile(sSource);
+		_source = _source;
+		_mmfile = new MmFile(_source);
 		_data = cast(const(char)[]) _mmfile[];
 
 		// Determine the container type (only 1 container type for today)
@@ -217,33 +277,77 @@ public:
 		//else _tagtype = xml;
 
 		// Read the stream header
-		_rEntity = parseXML!(simpleXML)(_data);
+		_rXml = parseXML!(simpleXML)(_data);
 
-		if(_rEntity.front.name != "container"){
+		if(_rXml.front.name != "container"){
 			stderr.writeln("Not a das2 xml container");
 		}
+		_rXml.popFront();
 
-		foreach(el; _rEntity){
-			if(el.type == EntityType.elementStart)
-				stdout.writeln(el.name);
-		}
+		// Iterate to next data packet
+		popFront();
+	}
 
-		//Iterate past all the non-data stuff, let the stream build up it's 
-		// internal definitions.
-		
-		//while( ds.front.type != DasStream.dataPacket && !ds.empty) 
-//				ds.popFront();
-
-		
-	//	DasDs[string] datasets;
+	void setProps(XmlStream rXml)
+	{
 
 	}
 
-	@property bool empty() { return true;}
-	@property ref DasPkt front() {return _pkt;}
+	@property bool empty() { return (_curPktId > 0); }
+
+	@property ref DasPkt front() {return _pkts[_curPktId];}
 
 	void popFront() {
 
+		_curPktId = -1;
+
+		NEXTPKT: while(!_rXml.empty){
+			// Open packet envelope
+			PktTag tag = getPktId(_rXml);
+			_rXml.popFront();
+
+			// At this point I can have a content entity, or a sub-packet but I
+			// should have something 
+			if(_rXml.empty) break NEXTPKT;
+
+			// Headers
+			if(tag.type == 'h'){
+				// Content switch
+				switch(_rXml.front.name){
+				case "comment":
+					_rXml.skipToParentEndTag();
+					_rXml.skipToEntityType(EntityType.elementStart);
+					continue NEXTPKT;
+				case "stream":
+					// Subsequent stream headers are okay, so long as they don't
+					// change the format
+					setProps(_rXml);
+					continue NEXTPKT;
+				case "packet":
+					_pkts[tag.id] = DasPkt(_rXml);
+					break NEXTPKT;
+				default:
+					throw new DasStreamException(format(
+						"[%s:%d] Unexpected header element '%s'", _source, 
+						_rXml.front.pos.line, _rXml.front.name
+					));
+				}
+			}
+
+			// Data
+			if(tag.type == 'd'){
+				if(tag.id !in _pkts)
+					throw new DasStreamException(format(
+						"[%s:%d] Data packet id='%d' received before "~
+						"header packet %s", _source, _rXml.front.pos.line, tag.id
+					));
+				if(_rXml.front.type == EntityType.text)
+
+				_pkts[tag.id].setData(cast( const(ubyte)[] ) _rXml.front.text);
+				_curPktId = tag.id;
+				break NEXTPKT;
+			}
+		}	
 	}
 
 }
