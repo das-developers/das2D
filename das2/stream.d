@@ -14,6 +14,8 @@ import std.system; // Endian, OS
 import std.conv : to;
 import std.typecons: Tuple;
 import std.algorithm: find;
+import std.system: Endian, endian;
+import std.string: toLower;
 
 import das2.time;
 import das2.units;
@@ -54,6 +56,7 @@ struct PktProp{
 	string[string] alt;  //keys are language codes
 }
 
+// Read <properties><p> elements from a dom object
 size_t setProperties(PktProp[string] props, DomObj root)
 {
 	size_t uPropsSet = 0;
@@ -138,17 +141,99 @@ size_t setProperties(PktProp[string] props, XmlStream rXml)
 
 /* ************************************************************************* */
 
+// The actual buffer can be of different types
+enum BufferType {TEXT, DOUBLE, FLOAT, BYTE, SHORT, INT, LONG };
+
+// All types can be encoded as text, so we have to know what they mean
+enum SemanticType {STRING, TIME, INTEGER, REAL};
+
+enum INVALID_WIDTH = -1;
+enum VARIABLE_WIDTH = 0;
+
+// I bet this is why hectonano seconds exists: y m d h M S ms μs hns
+// UTC Binary encoding? YYYY-MM-DDTHH:MM:SS -> 2 1 1 1 1 1  2  2   1 = 12 bytes
+// Gives a range of 64K years at 10 nanosecond resolution and easy to parse.
+
+// The default decoding for a value is: encode="text*", delim=" ", type="real"
+//    with delimiter merging turned on
+// The default byte order is little endian;
+
+struct Decode {
+	BufferType buf_type = BufferType.TEXT;
+	SemanticType sem_type = SemanticType.REAL;
+	int width = VARIABLE_WIDTH;  // 0 = arbitrary length, -1 is invalid have to get len
+	ubyte[] delim;
+	Endian order = Endian.littleEndian;
+	bool mergedelim = true;  // multiple spaces treated as single space
+	string lang = "en";      // default language to assume for properties
+}
+
+
+/** Override values in a given decoding using attributes from a dom object */
+Decode setDecoding(Decode decode, DomObj el)
+{
+	// Set the default decoding and parse default properties
+	foreach(attr; el.attributes){
+		switch(attr.name){
+		case "version":
+			if(attr.value != "2.3/basic")
+				errorf("Unknown stream version '%s' this might not go well", attr.value);
+			break;
+		case "encode":
+			switch(attr.value){
+			case "text":
+				decode.width = INVALID_WIDTH; // must override
+				decode.buf_type = BufferType.TEXT;
+				break;
+			case "text*":
+				decode.width = VARIABLE_WIDTH;
+				decode.buf_type = BufferType.TEXT;
+				break;
+			case "double":
+				decode.width = 8; decode.buf_type = BufferType.DOUBLE; break;
+			case "float":
+				decode.width = 4; decode.buf_type = BufferType.BYTE; break;
+			case "short":
+				decode.width = 2; decode.buf_type = BufferType.SHORT; break;
+			case "int":
+				decode.width = 4; decode.buf_type = BufferType.INT; break;
+			case "long":
+				decode.width = 8; decode.buf_type = BufferType.LONG; break;
+			default:
+				throw new StreamException(format(
+					"Unknown default value encoding '%s' in element %s, line %d",
+					attr.value, el.name, el.pos.line
+				));
+			}
+			break;
+
+		case "delim":
+			if(attr.value == "space"){ decode.delim[0] = ' ';  break; }
+			if(attr.value == "tab"){   decode.delim[0] = '\t';  break;}
+			decode.delim = cast(ubyte[]) attr.value.dup;
+			break;
+
+		case "mergedelim":
+			decode.mergedelim =  (attr.value.toLower() == "true");
+			break;
+
+		case "lang":
+			decode.lang = attr.value.dup;
+			break;
+
+		default:   //Just igonre other stuff
+			break;
+		}
+	}
+	return decode;
+}
+
+/* ************************************************************************ */
+
 struct PktAry{
 private:
-	// The actual buffer can be of different types
-	enum EncodingType {CHARS, DOUBLES, FLOATS, SHORTS, INTS, LONGS };
-
-	// All types can be encoded as ascii, so we have to know what they mean
-	enum SemanticType {STRINGS, TIMES, INTS, REALS /*asciiXX*/};
 	
-	EncodingType _buf_type;
-	SemanticType _semantic;
-	Endian _buf_endian;
+	Decode _decode;
 	
 	ubyte[] _rawdata;
 
@@ -160,9 +245,9 @@ private:
 	
 public:
 
-	this(DomObj root, const(ubyte)[] delim)
+	this(Decode decode, DomObj elArray)
 	{
-		if(delim.length > 0) _delim = delim.dup;
+		_decode = setDecoding(decode, elArray);
 
 		throw new StreamException("Array construction");
 	}
@@ -172,29 +257,43 @@ public:
 		// Cast the byte array to the appropriate buffer type, read data byte
 		// swapping if necessary.  Keep track of the number of bytes read and 
 		// return a shortened slice.
+		size_t uRead = 0;
 
+		// Buffer Type              Internal Type
+
+      // char* (needs delim) *    string, time, double, long, float, ints, short
+
+		// charN               N    String
+		// 
+		// double BE, LE       8    time, 
+		// long   BE, LE       8
+		// float  BE, LE       4
+		// ints   BE, LE       4
+		// short  BE, LE       2
+
+		// Char -> Long -> Time (epop, units)
 
 		return _data;
 	}
 
 	long vint(){
-		switch(_buf_type){
-		case EncodingType.CHARS:   return to!long( (cast(const(char)[]) _rawdata)[0] );
-		case EncodingType.DOUBLES: return to!long( (cast(const(double)[]) _rawdata)[0]);
-		case EncodingType.FLOATS:  return to!long( (cast(const(float)[]) _rawdata)[0]);
-		case EncodingType.SHORTS:  return to!long( (cast(const(short)[]) _rawdata)[0]);
-		case EncodingType.INTS:    return to!long( (cast(const(int)[]) _rawdata)[0]);
+		switch(_decode.buf_type){
+		case BufferType.TEXT:   return to!long( (cast(const(char)[]) _rawdata)[0] );
+		case BufferType.DOUBLE: return to!long( (cast(const(double)[]) _rawdata)[0]);
+		case BufferType.FLOAT:  return to!long( (cast(const(float)[]) _rawdata)[0]);
+		case BufferType.SHORT:  return to!long( (cast(const(short)[]) _rawdata)[0]);
+		case BufferType.INT:    return to!long( (cast(const(int)[]) _rawdata)[0]);
 		default:   return (cast(const(int)[])_rawdata)[0];
 		}
 	}
 
 	double vreal(){
-		switch(_buf_type){
-		case EncodingType.CHARS:   return to!double( (cast(const(char)[]) _rawdata)[0]);
-		case EncodingType.FLOATS:  return to!double( (cast(const(float)[]) _rawdata)[0]);
-		case EncodingType.SHORTS:  return to!double( (cast(const(short)[]) _rawdata)[0]);
-		case EncodingType.INTS:    return to!double( (cast(const(int)[]) _rawdata)[0]);
-		case EncodingType.LONGS:   return to!double( (cast(const(long)[]) _rawdata)[0]);
+		switch(_decode.buf_type){
+		case BufferType.TEXT:   return to!double( (cast(const(char)[]) _rawdata)[0]);
+		case BufferType.FLOAT:  return to!double( (cast(const(float)[]) _rawdata)[0]);
+		case BufferType.SHORT:  return to!double( (cast(const(short)[]) _rawdata)[0]);
+		case BufferType.INT:    return to!double( (cast(const(int)[]) _rawdata)[0]);
+		case BufferType.LONG:   return to!double( (cast(const(long)[]) _rawdata)[0]);
 		default:
 			return (cast(const(double)[])_rawdata)[0];
 		}	
@@ -202,7 +301,7 @@ public:
 
 	DasTime vtime(){
 		if(_units == UNIT_UTC){
-			if(_buf_type != EncodingType.CHARS)
+			if(_decode.buf_type != BufferType.TEXT)
 				throw new TypeException("units=\"UTC\" but raw data are not characters");
 			return DasTime(cast(const(char)[]) _rawdata);
 		}
@@ -237,22 +336,22 @@ public:
 	}
 
 	string vchar(){
-		// If the underlying buffer type is character data, just give it to the
-		if(_buf_type == EncodingType.CHARS)
+		// If the underlying buffer type is character data, just give it to them
+		if(_decode.buf_type == BufferType.TEXT)
 			return (cast(string) _rawdata);
 
 		// Okay, it's not so convert something to a string
-		if(_semantic == SemanticType.TIMES)
+		if(_decode.sem_type == SemanticType.TIME)
 			return vtime().toString();
 
-		if(_semantic == SemanticType.INTS)
+		if(_decode.sem_type == SemanticType.INTEGER)
 			return format("%d", vint());
 
 		return format("%.8e", vreal());
 	}
 
 	int opCmp(T)(auto ref const T other) if( is(T == int) || is(T == double) ){
-		switch(_semantic){
+		switch(_decode.sem_type){
 
 		// read as integer, also works for times encoded as integers
 		case SemanticType.INTS:
@@ -293,7 +392,7 @@ public:
 	} 
 
 	int opCmp(T)(auto ref const T other) if( is(T:DasTime) ){
-		if(_semantic != SemanticType.TIMES)
+		if(_decode.sem_type != SemanticType.TIMES)
 			throw new TypeException("None time values can't be compared to a DasTime");
 		DasTime dt = vtime();
 		return dt.opCmp(other);
@@ -308,7 +407,7 @@ struct PktDim {
 
 	string[] _readOrder;
 
-	this(DomObj root, PktProp[string] streamProps, ubyte[] delim){
+	this(Decode decode, PktProp[string] streamProps, DomObj root){
 		// Merge the stream props in with my props, then override later
 		foreach(key, val; streamProps)
 			_props[key] = val;
@@ -322,7 +421,7 @@ struct PktDim {
 				auto attr = find!(a=> (a.name == "usage"))(el.attributes);
 				if(!attr.empty) usage = attr.front.value.dup;
 				
-				_arrays[usage] = PktAry(el, delim);
+				_arrays[usage] = PktAry(decode, el);
 				_readOrder[$] = usage;
 			}
 
@@ -359,16 +458,13 @@ struct DasPkt {
 	string[] _readOrder;
 	ubyte[] _delim;
 
-	this(XmlStream rXml, PktProp[string] streamProps)
+	this(Decode decode, PktProp[string] props, XmlStream rXml)
 	{
 		auto dom = parseDOM(rXml);
 		auto root = dom.children[0];
-		foreach(attr; root.attributes){
-			if( attr.name == "delim" && attr.value == "space"){
-				_delim[0] = ' ';
-				break;
-			}
-		}
+
+		// Override the decoding with local props
+		decode = setDecoding(decode, root);
 
 		foreach(pdim; root.children){
 			if(pdim.name == "yset" || pdim.name == "zset" || pdim.name == "wset")
@@ -385,7 +481,7 @@ struct DasPkt {
 				throw new StreamException(format("Required attribute 'pdim' missing from element '%s'", pdim.name));
 			
 			_readOrder[$] = attr.front.name.dup;
-			_dims[_readOrder[$-1]] = PktDim(pdim, streamProps, _delim);
+			_dims[_readOrder[$-1]] = PktDim( decode, props, pdim);
 		}
 	}
 
@@ -410,6 +506,8 @@ class InputPktRange{
 package:
 
 	alias PktTag = Tuple!(int, "id", char, "type");
+
+	Decode _decode; // The default decoding for a stream, unless overridden
 
 	const char[] _data;
 	MmFile _mmfile;
@@ -445,11 +543,31 @@ package:
 		));
 	}
 
+	void parseHeader(XmlStream rXml){
+		auto dom = parseDOM(rXml);
+		auto root = dom.children[0];
+
+		_decode = setDecoding(_decode, root);
+		// If I have a properties sub element, set those too
+		foreach(item; root.children){
+			if((item.type == EntityType.elementStart)&&(item.name == "properties"))
+				setProperties(_props, item);
+		}
+	}
+
 public:
 	this(string sSource){
 		_source = _source;
 		_mmfile = new MmFile(_source);
 		_data = cast(const(char)[]) _mmfile[];
+
+		_decode.buf_type = BufferType.TEXT;
+		_decode.sem_type = SemanticType.REAL;
+		_decode.width = 0; // 0 = arbitrary length, use delims
+		_decode.delim[0] = ' '; // space delimited is easiest to read
+		_decode.order = Endian.littleEndian;
+		_decode.mergedelim = true;
+		_decode.lang  = "en";  // assume english as default
 
 		// Determine the container type (only 1 container type for today)
 		//if(_data[0] == '[') _tagtype = binary_fixed;
@@ -494,12 +612,10 @@ public:
 					_rXml.skipToEntityType(EntityType.elementStart);
 					continue NEXTPKT;
 				case "stream":
-					// Subsequent stream headers are okay, so long as they don't
-					// change the format
-					setProperties(_props, _rXml);
+					parseHeader(_rXml);
 					continue NEXTPKT;
 				case "packet":
-					_pkts[tag.id] = DasPkt(_rXml, _props);
+					_pkts[tag.id] = DasPkt(_decode, _props, _rXml);
 					break NEXTPKT;
 				default:
 					throw new StreamException(format(
