@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!-- The namespace attributes are just include for completeness they are
+     not required.  Likewise, the xml declaration above is also not 
+     require.  However, the 'version' attribute below *is* required.  -->
+
+<stream version="2.3/basic-xml"
+
+  xmlns="https://das2.org/v2.3-basic-xml"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="https://das2.org/v2.3-basic-xml
+  https://das2.org/schema/v2.3-basic-xml.xsd"
+>
+
+<!-- Default propertes for all packets =================================== -->
+
+<properties>
+  <p name="title">Voyager 1 MAG Heilographic 48s File Index</p>
+  <p name="voyager">1</p>
+  <p name="resolution" type="Datum">48 s</p>
+</properties>
+
+<!-- Data packet definition ============================================== -->
+
+<packet id="1">
+  <x pdim="time">
+    <properties>
+      <p name="summary">
+      This is the coverage period of each file.  Data may exist for the
+      whole coverage period.  As is traditional, the max value is an 
+      exclusive upper bound.
+      </p>
+    </properties>
+
+    <array usage="min" type="isotime" units="UTC" />
+    <array usage="max" type="isotime" units="UTC" />
+  </x>
+
+  <y pdim="source">
+    <properties>
+      <p name="summary">
+      The Voyager MAG Science experiment consists of two magnetometers.
+      A low-field sensor and a high-field sensor.  The Voyager MAG
+      archive at CDAweb provides data in *.dua, *.pri, *.sec which I'm
+      guessing represents "dual", "primariy", "secondary".  These are
+      represented by:
+        d - dual
+        p - primary
+        s - secondary
+      Presumably, "dual" data are the best, followed by "primary".
+      -C. Piker
+      </p>
+    </properties>
+  		
+    <array type="string" />
+  </y>
+
+  <y pdim="rel_path">
+    <properties>
+      <p name="summary">
+      The relative file path from the location of this index file.
+      </p>
+    </properties>
+
+    <array type="string" />
+  </y>
+</packet>
+
+<!-- Data Packets ======================================================= -->
+
+<d id="1">1977-356 1977-361 d ../cdaweb/summary/v1/y77/s48v17735600.dua</d>
+<d id="1">1977-361 1978-001 d ../cdaweb/summary/v1/y77/s48v17736100.dua</d>
+<d id="1">1978-001 1978-006 d ../cdaweb/summary/v1/y78/48s/s48v17800100.dua</d>
+<d id="1">1978-006 1978-011 d ../cdaweb/summary/v1/y78/48s/s48v17800600.dua</d>
+<d id="1">1978-011 1978-016 d ../cdaweb/summary/v1/y78/48s/s48v17801100.dua</d>
+<d id="1">1979-326 1979-331 d ../cdaweb/summary/v1/y79/48s/s48v17932600.dua</d>
+<d id="1">1979-331 1979-336 d ../cdaweb/summary/v1/y79/48s/s48v17933100.dua</d>
+<d id="1">1979-336 1979-341 d ../cdaweb/summary/v1/y79/48s/s48v17933600.dua</d>
+<d id="1">1979-341 1979-346 d ../cdaweb/summary/v1/y79/48s/s48v17934100.dua</d>
+<d id="1">1979-346 1979-351 d ../cdaweb/summary/v1/y79/48s/s48v17934600.dua</d>
+<d id="1">1979-351 1979-356 d ../cdaweb/summary/v1/y79/48s/s48v17935100.dua</d>
+<d id="1">1979-356 1979-361 d ../cdaweb/summary/v1/y79/48s/s48v17935600.dua</d>
+<d id="1">1979-361 1980-001 d ../cdaweb/summary/v1/y79/48s/s48v17936100.dua</d>
+<d id="1">1980-001 1980-006 d ../cdaweb/summary/v1/y80/s48v18000100.dua</d>
+<d id="1">1980-006 1980-011 d ../cdaweb/summary/v1/y80/s48v18000600.dua</d>
+<d id="1">1980-011 1980-016 d ../cdaweb/summary/v1/y80/s48v18001100.dua</d>
+<d id="1">1980-016 1980-021 d ../cdaweb/summary/v1/y80/s48v18001600.dua</d>
+<d id="1">1980-021 1980-026 d ../cdaweb/summary/v1/y80/s48v18002100.dua</d>
+<d id="1">1980-026 1980-031 d ../cdaweb/summary/v1/y80/s48v18002600.dua</d>
+<d id="1">1980-031 1980-036 d ../cdaweb/summary/v1/y80/s48v18003100.dua</d>

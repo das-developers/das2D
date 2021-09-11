@@ -180,7 +180,7 @@ else{
 	bool swap = false;
 }	
 
-	// And the obligatory postblt for the dynamic array member
+	// And the obligatory postblit for the dynamic array member
 	this(this){
 		delim = delim.dup;
 	}
@@ -572,7 +572,7 @@ public:
 	} 
 
 	int opCmp(T)(auto ref const T other) if( is(T:DasTime) ){
-		if(_decode.sem_type != SemanticType.TIMES)
+		if(_decode.sem_type != SemanticType.TIME)
 			throw new TypeException("None time values can't be compared to a DasTime");
 		DasTime dt = vtime();
 		return dt.opCmp(other);
@@ -723,10 +723,12 @@ package:
 
 public:
 	this(string sSource){
-		_source = _source;
+		_source = sSource;
+		infof("Reading %s", _source);
 		_mmfile = new MmFile(_source);
 		_data = cast(const(char)[]) _mmfile[];
 
+		_decode.delim.length = 1;
 		_decode.delim[0] = ' '; // have to set dynamic array val at runtime
 		
 		// Determine the container type (only 1 container type for today)
@@ -809,4 +811,57 @@ public:
 
 InputRange!DasPkt inputPktRange(string sFile){
 	return inputRangeObject(new InputPktRange(sFile));
+}
+
+
+unittest{
+
+struct DataFiles{
+
+	DasTime _beg, _end;
+	InputRange!DasPkt _ds;
+	string _indexName;
+	const char[] _index;
+	bool _empty;
+	string _file;
+
+	this(string sIndex, DasTime dtBeg, DasTime dtEnd)
+	{
+		_indexName = sIndex; _beg = dtBeg; _end = dtEnd;
+
+		auto ipr = new InputPktRange(sIndex); // Public radio is useful
+
+		// Get a das packet stream filtered on our time range, for files 
+		// that actually exist on disk
+		_ds = ipr
+			.filter!(p => p["time", "min"] < _end && p["time", "max"] > _beg)
+			.inputRangeObject;
+
+		if(!_ds.empty){
+			_file = _ds.front["rel_path"].vchar;
+		}
+	}
+
+	@property bool empty()  { return _ds.empty; }
+	@property string front() return { return _file; }
+
+	void popFront(){
+		_ds.popFront();
+		if(!_ds.empty){
+			_file = _ds.front["rel_path"].vchar;
+		}
+	}
+}
+
+DasTime beg = DasTime("1979-063");
+DasTime end = DasTime("1979-079");
+
+string sIndex = "./test/vg1_mag_hg_48s_index.xml";
+
+foreach(el; DataFiles(sIndex, beg, end)){
+	writeln("File: ", el, " is in range");
+		
+}
+
+
 }
