@@ -13,9 +13,9 @@ import std.format : format;
 import std.system; // Endian, OS
 import std.conv : to;
 import std.typecons: Tuple;
-import std.algorithm: find;
+import std.algorithm: find, endsWith, skipOver;
 import std.system: Endian, endian;
-import std.string: toLower;
+import std.string: toLower, indexOfAny;
 
 import das2.time;
 import das2.units;
@@ -44,7 +44,7 @@ this(	string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
 
 enum DimAxis {X, Y, Z, W};
 
-enum PropType {STR, DATUM, BOOL, INT, REAL, DATUM_RNG, REAL_RNG};
+enum PropType {STR, DATUM, BOOL, INTEGER, REAL, DATUM_RNG, REAL_RNG};
 
 /++ Items have a intrinsic encoding, but also a semantic meaning.  For example
  + the string "2019-001T14:00" is a 14-byte array, but it is also a UTC time
@@ -57,7 +57,7 @@ struct PktProp{
 }
 
 // Read <properties><p> elements from a dom object
-size_t setProperties(PktProp[string] props, DomObj root)
+size_t mergeProperties(PktProp[string] props, DomObj root)
 {
 	size_t uPropsSet = 0;
 
@@ -71,12 +71,12 @@ size_t setProperties(PktProp[string] props, DomObj root)
 			if(attr.name == "name"){ name = attr.name.dup; continue;}
 			if(attr.name == "type"){
 				switch(attr.value){
-				case "Datum": type = PropType.DATUM; break;
-				case "boolean": type = PropType.BOOL; break;
-				case "int": type = PropType.INT; break;
-				case "double": type = PropType.REAL; break;
+				case "Datum":      type = PropType.DATUM;     break;
+				case "boolean":    type = PropType.BOOL;      break;
+				case "integer":    type = PropType.INTEGER;   break;
+				case "real":       type = PropType.REAL;      break;
 				case "DatumRange": type = PropType.DATUM_RNG; break;
-				case "doubleRange": type = PropType.REAL_RNG; break;
+				case "realRange":  type = PropType.REAL_RNG;  break;
 				default:
 					throw new StreamException(format(
 						"Unknown property type '%s' at line %d", attr.value, elProp.pos.line
@@ -132,11 +132,11 @@ size_t setProperties(PktProp[string] props, DomObj root)
 	return uPropsSet;
 }
 
-size_t setProperties(PktProp[string] props, XmlStream rXml)
+size_t mergeProperties(PktProp[string] props, XmlStream rXml)
 {
 	auto dom = parseDOM(rXml);
 	auto root = dom.children[0];
-	return setProperties(props, root);
+	return mergeProperties(props, root);
 }
 
 /* ************************************************************************* */
@@ -158,51 +158,95 @@ enum VARIABLE_WIDTH = 0;
 //    with delimiter merging turned on
 // The default byte order is little endian;
 
-struct Decode {
+private struct Decode {
 	BufferType buf_type = BufferType.TEXT;
 	SemanticType sem_type = SemanticType.REAL;
-	int width = VARIABLE_WIDTH;  // 0 = arbitrary length, -1 is invalid have to get len
+
+	// Number of bytes for each buffer block.  (so double == 8)
+	int bytes_per_blk = 1;
+
+	// Number of buffer blocks per item (can be variable)
+	int blks_per_item = VARIABLE_WIDTH;  // 0 = arbitrary length, -1 is invalid have to get len	
+
 	ubyte[] delim;
 	Endian order = Endian.littleEndian;
 	bool mergedelim = true;  // multiple spaces treated as single space
 	string lang = "en";      // default language to assume for properties
+
+version(BegEndian){
+	bool swap = true;       // true if byte swapping is needed for a value type
+}
+else{
+	bool swap = false;
+}	
+
+	// And the obligatory postblt for the dynamic array member
+	this(this){
+		delim = delim.dup;
+	}
 }
 
 
 /** Override values in a given decoding using attributes from a dom object */
-Decode setDecoding(Decode decode, DomObj el)
+private Decode cascadeDecode(AR)(Decode decode, AR rAttributes, int nLineNo)
+	if(isAttrRange!AR)
 {
+	const(char)[] sBufType;
+
+	// Cascade decoding rules
+	Decode _decode = decode;
+
+	// The default for das2.3/basic streams is little endian, if you're a big
+	// endian machine, just assume you're going to need to swap values unless
+	// told otherwise
+version(BegEndian){
+	_decode.swap = true;
+}
+else{
+	_decode.swap = false;
+}
+	
 	// Set the default decoding and parse default properties
-	foreach(attr; el.attributes){
+	foreach(attr; rAttributes){
 		switch(attr.name){
 		case "version":
-			if(attr.value != "2.3/basic")
+			if(attr.value != "2.3/basic-xml")
 				errorf("Unknown stream version '%s' this might not go well", attr.value);
 			break;
+
 		case "encode":
-			switch(attr.value){
-			case "text":
-				decode.width = INVALID_WIDTH; // must override
-				decode.buf_type = BufferType.TEXT;
-				break;
-			case "text*":
-				decode.width = VARIABLE_WIDTH;
-				decode.buf_type = BufferType.TEXT;
-				break;
-			case "double":
-				decode.width = 8; decode.buf_type = BufferType.DOUBLE; break;
-			case "float":
-				decode.width = 4; decode.buf_type = BufferType.BYTE; break;
-			case "short":
-				decode.width = 2; decode.buf_type = BufferType.SHORT; break;
-			case "int":
-				decode.width = 4; decode.buf_type = BufferType.INT; break;
-			case "long":
-				decode.width = 8; decode.buf_type = BufferType.LONG; break;
+
+			// Get the number of blocks per item, defaults to 1, may be variable
+			decode.blks_per_item = 1;
+			sBufType = attr.value;
+			if(attr.value.endsWith("*")){
+				decode.blks_per_item = VARIABLE_WIDTH;
+				sBufType = attr.value[0..$-1];
+			}
+			else{
+				long iPos = attr.value.indexOfAny("123456789");
+				if(iPos > 1){
+					decode.blks_per_item = to!int(attr.value[iPos..$]);
+					if(decode.blks_per_item > 65536){ 
+						// 64K / item sanity check
+						throw new StreamException("Individual values larger than 64 kB are not supported");
+					}
+					sBufType = attr.value[0..iPos];
+				}
+			}
+			
+			switch(sBufType){
+			case "text":   decode.bytes_per_blk = 1; decode.buf_type = BufferType.TEXT; break;
+			case "float":  decode.bytes_per_blk = 4; decode.buf_type = BufferType.FLOAT; break;
+			case "double": decode.bytes_per_blk = 8; decode.buf_type = BufferType.DOUBLE; break;
+			case "byte":   decode.bytes_per_blk = 1; decode.buf_type = BufferType.BYTE; break;
+			case "short":  decode.bytes_per_blk = 2; decode.buf_type = BufferType.SHORT; break;
+			case "int":    decode.bytes_per_blk = 4; decode.buf_type = BufferType.INT; break;
+			case "long":   decode.bytes_per_blk = 8; decode.buf_type = BufferType.LONG; break;
 			default:
 				throw new StreamException(format(
-					"Unknown default value encoding '%s' in element %s, line %d",
-					attr.value, el.name, el.pos.line
+					"Unknown default value encoding in element at line %d",
+					attr.value, nLineNo
 				));
 			}
 			break;
@@ -221,6 +265,15 @@ Decode setDecoding(Decode decode, DomObj el)
 			decode.lang = attr.value.dup;
 			break;
 
+		case "byteorder":
+version(BegEndian){
+			if(attr.value == "BE") decode.swap = false;
+}
+else{
+			if(attr.value == "BE") decode.swap = true;
+}
+			break;
+
 		default:   //Just igonre other stuff
 			break;
 		}
@@ -230,50 +283,177 @@ Decode setDecoding(Decode decode, DomObj el)
 
 /* ************************************************************************ */
 
+enum VARIABLE_ITEMS = 0;
+
 struct PktAry{
 private:
-	
+	string _name;
+
 	Decode _decode;
 	
 	ubyte[] _rawdata;
 
-	char cFieldSep;
 	Units _units;
 
-	ubyte[] _delim;
-	int _items;
+	int _items = 1; // 0 = variable number of items, need terminator
 	
 public:
 
-	this(Decode decode, DomObj elArray)
+	this(Decode decode, string sPdimName, DomObj elArray)
 	{
-		_decode = setDecoding(decode, elArray);
 
-		throw new StreamException("Array construction");
+		// Cascade down encoding attributes
+		_decode = cascadeDecode(decode, elArray.attributes, elArray.pos.line);
+
+		foreach(attr; elArray.attributes){
+			switch(attr.name){
+			case "usage":
+				_name = format("%s.%s", sPdimName, attr.value);
+				break;
+
+			case "units": _units = Units(attr.value); break;
+
+			case "type":
+				switch(attr.value){
+				case "string":  _decode.sem_type = SemanticType.STRING;  break;
+				case "isotime": _decode.sem_type = SemanticType.TIME;    break;
+				case "real":    _decode.sem_type = SemanticType.REAL;    break;
+				case "integer": _decode.sem_type = SemanticType.INTEGER; break;
+				default:
+					throw new StreamException(format("Unknown value type '%s' in "~
+						"element '%s' at line %d'", attr.value, elArray.name, 
+						elArray.pos.line
+					));
+				}
+				break;
+
+			case "nitems":
+				if(attr.value == "*") _items = VARIABLE_ITEMS; break;
+
+			default:
+				break; // ignore other stuff
+			}
+		}
+
+		if(_name.length == 0)
+			_name = _name = format("%s.center", sPdimName);
+		
+		// if we're not using variable length stuff, go ahead an initialize the
+		// buffer for storing values
+		if(_decode.blks_per_item != VARIABLE_WIDTH && _items != VARIABLE_ITEMS){
+			_rawdata.length = _decode.blks_per_item * _items;
+		}
+
+		if(_decode.blks_per_item == VARIABLE_WIDTH && _decode.delim.length == 0){
+			throw new StreamException(format("Element <array> at %d has variable "~
+				"width items, but no 'delim'inator has been set.", elArray.pos.line
+			));
+		}
 	}
 
-	const(ubyte)[] setData(const(ubyte)[] _data)
+	// Could just use reverse here (might change later)
+	private void swapCopyN(ubyte[] dest, const(ubyte)[] src, size_t uLen){
+		switch(uLen){
+		case 8:
+			dest[0] = src[7]; dest[1] = src[6];
+			dest[2] = src[5]; dest[3] = src[4];
+			dest[4] = src[3]; dest[5] = src[2];
+			dest[6] = src[1]; dest[7] = src[0];
+			break;
+		case 4:
+			dest[0] = src[3]; dest[1] = src[2];
+			dest[2] = src[1]; dest[3] = src[0];
+			break;
+		case 2:
+			dest[0] = src[1]; dest[1] = src[0];
+			break;
+		case 1:
+			dest[0] = src[0];
+			break;
+		default:
+			throw new StreamException(format(
+				"Byte swapping size %s items not implemented", uLen
+			));
+		}
+	}
+
+	// Read one item off the range and reduce it.  Returns true if an item was
+	// read, false otherwise
+	private bool readItem(ref const(ubyte)[] data)
 	{
-		// Cast the byte array to the appropriate buffer type, read data byte
-		// swapping if necessary.  Keep track of the number of bytes read and 
-		// return a shortened slice.
-		size_t uRead = 0;
+		size_t uBlkSz = _decode.bytes_per_blk;
+		size_t uDlmSz = _decode.delim.length;
+		size_t uItemBlks = _decode.blks_per_item;
 
-		// Buffer Type              Internal Type
+		if(uDlmSz > 0)
+			while(skipOver(_decode.delim, data)){ } // shortens the range
 
-      // char* (needs delim) *    string, time, double, long, float, ints, short
+		if(uItemBlks > 0){
+			size_t uAll = uItemBlks * uBlkSz;
 
-		// charN               N    String
-		// 
-		// double BE, LE       8    time, 
-		// long   BE, LE       8
-		// float  BE, LE       4
-		// ints   BE, LE       4
-		// short  BE, LE       2
+			if(data.length < uAll) return false;
 
-		// Char -> Long -> Time (epop, units)
+			if(!_decode.swap || uBlkSz == 1){
+				_rawdata[$..$+uAll] = data[0..uAll];  // no swap, copy in all blocks
+				data = data[uAll..$];                 // Shortens the range
+			}
+			else{
+				// swap copy each block
+				for(size_t u = 0; u < uItemBlks; ++u){
+					swapCopyN(_rawdata[$ .. $+uBlkSz], data, uBlkSz);
+					data = data[uBlkSz .. $];
+				}
+			}
 
-		return _data;
+			return true;
+		}
+		else{  // Variable number of blocks per item, read till delim or no more data
+			
+			bool bItemRead = false;
+
+			if(uDlmSz == 0)
+				throw new StreamException("No delimiter set for variable length items");
+
+			while((data.length > uBlkSz) && (data[0..uDlmSz] != _decode.delim)){
+
+				if(!_decode.swap || uBlkSz == 1) 
+					_rawdata[$ .. $+uBlkSz] = data[0 .. uBlkSz];
+				else
+					swapCopyN(_rawdata[$ .. $+uBlkSz], data, uBlkSz);
+
+				data = data[uBlkSz .. $];  // Shortens the range
+				bItemRead = true;
+			}
+
+			return bItemRead;
+		}
+	}
+
+	// Copy (and swap if needed) N number of items at M_n bytes each 
+	const(ubyte)[] setData(const(ubyte)[] data)
+	{
+		_rawdata.length = 0;
+
+		if(_items != VARIABLE_ITEMS){
+
+			for(size_t u = 0; u < _items; ++u)
+				if(! readItem(data) )
+					throw new StreamException("Data packet too short for array"~_name);	
+		}
+		else{
+			// We don't have array row terminators yet, so just read until hit
+			// end of data
+
+			size_t uRead = 0;
+			while(readItem(data)) ++uRead;
+			
+			// Assume that a variable number of items still needs at least one,
+			// might be a dubious assumption
+			if(uRead == 0)
+				throw new StreamException("Data packet too short for array"~_name);
+		}
+		
+		return data;
 	}
 
 	long vint(){
@@ -404,24 +584,33 @@ public:
 struct PktDim {
 	PktProp[string] _props;
 	PktAry[string] _arrays;  //one array for each usage
-
 	string[] _readOrder;
+	string _name;
 
 	this(Decode decode, PktProp[string] streamProps, DomObj root){
+
+		auto attr = find!(a=> (a.name == "name"))(root.attributes);
+		if(attr.empty)
+			throw new StreamException(format(
+				"Physical dimension name missing in element '%s' at %d",
+				root.name, root.pos.line
+			));
+		_name = attr.front.value.dup;
+
 		// Merge the stream props in with my props, then override later
 		foreach(key, val; streamProps)
 			_props[key] = val;
 		
 		foreach(el; root.children){
 			if(el.name == "properties")
-				setProperties(_props, el);
+				mergeProperties(_props, el);
 
 			if(el.name == "array"){
 				string usage = "center";
-				auto attr = find!(a=> (a.name == "usage"))(el.attributes);
+				attr = find!(a=> (a.name == "usage"))(el.attributes);
 				if(!attr.empty) usage = attr.front.value.dup;
 				
-				_arrays[usage] = PktAry(decode, el);
+				_arrays[usage] = PktAry(decode, _name, el);
 				_readOrder[$] = usage;
 			}
 
@@ -457,14 +646,14 @@ struct DasPkt {
 	PktDim[string] _dims;
 	string[] _readOrder;
 	ubyte[] _delim;
+	Decode _decode;
 
 	this(Decode decode, PktProp[string] props, XmlStream rXml)
 	{
 		auto dom = parseDOM(rXml);
 		auto root = dom.children[0];
 
-		// Override the decoding with local props
-		decode = setDecoding(decode, root);
+		_decode = cascadeDecode(decode, root.attributes, root.pos.line);
 
 		foreach(pdim; root.children){
 			if(pdim.name == "yset" || pdim.name == "zset" || pdim.name == "wset")
@@ -481,7 +670,7 @@ struct DasPkt {
 				throw new StreamException(format("Required attribute 'pdim' missing from element '%s'", pdim.name));
 			
 			_readOrder[$] = attr.front.name.dup;
-			_dims[_readOrder[$-1]] = PktDim( decode, props, pdim);
+			_dims[_readOrder[$-1]] = PktDim( _decode, props, pdim);
 		}
 	}
 
@@ -511,48 +700,25 @@ package:
 
 	const char[] _data;
 	MmFile _mmfile;
+	XmlStream _rXml;
 
 	// Only support XML tag types for now, others can be added as needed
 	//enum TagType {binary_fixed, binary_var, xml};
 	//TagType _tagtype;
-	
-	XmlStream _rXml;
 	
 	PktProp[string] _props;
 	DasPkt[int] _pkts;  // Not an array, a map
 	int _curPktId = -1;
 	string _source;     // Save the data source for error reports
 
-	PktTag getPktId(XmlStream rXml){
-
-		if(_rXml.front.name == "h" || _rXml.front.name == "d"){
-			auto attr = find!(a=> (a.name == "id"))(_rXml.front.attributes);
-			if(attr.empty){
-				throw new StreamException(format(
-					"[%s:%d] The 'id' attribute is missing from the XML header"~
-					"packet container", _source, _rXml.front.pos.line
-				));
-			}
-			return PktTag(to!int(attr.front.value), _rXml.front.name[0]);
-		}
-		
-		// Wierd stuff 
-		throw new StreamException(format(
-			"[%s:%d] Unknown packet tag element '%s'",
-			_source, _rXml.front.pos.line, _rXml.front.name
-		));
-	}
-
-	void parseHeader(XmlStream rXml){
-		auto dom = parseDOM(rXml);
-		auto root = dom.children[0];
-
-		_decode = setDecoding(_decode, root);
-		// If I have a properties sub element, set those too
-		foreach(item; root.children){
-			if((item.type == EntityType.elementStart)&&(item.name == "properties"))
-				setProperties(_props, item);
-		}
+	int getPktId(XmlStream rXml){
+		auto attr = find!(a=> (a.name == "id"))(rXml.front.attributes);
+		if(attr.empty)
+			throw new StreamException(format(
+				"[%s:%d] 'id' attribute missing from <%s> element. ",
+					_source, rXml.front.pos.line, rXml.front.name
+			));
+		return to!int(attr.front.value);
 	}
 
 public:
@@ -561,14 +727,8 @@ public:
 		_mmfile = new MmFile(_source);
 		_data = cast(const(char)[]) _mmfile[];
 
-		_decode.buf_type = BufferType.TEXT;
-		_decode.sem_type = SemanticType.REAL;
-		_decode.width = 0; // 0 = arbitrary length, use delims
-		_decode.delim[0] = ' '; // space delimited is easiest to read
-		_decode.order = Endian.littleEndian;
-		_decode.mergedelim = true;
-		_decode.lang  = "en";  // assume english as default
-
+		_decode.delim[0] = ' '; // have to set dynamic array val at runtime
+		
 		// Determine the container type (only 1 container type for today)
 		//if(_data[0] == '[') _tagtype = binary_fixed;
 		//else if(_data[0] == '|') _tagtype = binary_var;
@@ -577,10 +737,14 @@ public:
 		// Read the stream header
 		_rXml = parseXML!(simpleXML)(_data);
 
-		if(_rXml.front.name != "container"){
-			stderr.writeln("Not a das2 xml container");
-		}
-		_rXml.popFront();
+		if(_rXml.front.name != "stream")
+			throw new StreamException(format("First element is named %s, "~
+				"expected 'stream'", _rXml.front.name
+			));
+		
+		_decode = cascadeDecode(
+			_decode, _rXml.front.attributes, _rXml.front.pos.line
+		);
 
 		// Iterate to next data packet
 		popFront();
@@ -591,56 +755,56 @@ public:
 	@property ref DasPkt front() {return _pkts[_curPktId];}
 
 	void popFront() {
-
-		_curPktId = -1;
+		int id = 0;
 
 		NEXTPKT: while(!_rXml.empty){
-			// Open packet envelope
-			PktTag tag = getPktId(_rXml);
+			
 			_rXml.popFront();
 
-			// At this point I can have a content entity, or a sub-packet but I
-			// should have something 
+			// At this point I should have the start of the next element
 			if(_rXml.empty) break NEXTPKT;
 
-			// Headers
-			if(tag.type == 'h'){
-				// Content switch
-				switch(_rXml.front.name){
-				case "comment":
-					_rXml.skipToParentEndTag();
-					_rXml.skipToEntityType(EntityType.elementStart);
-					continue NEXTPKT;
-				case "stream":
-					parseHeader(_rXml);
-					continue NEXTPKT;
-				case "packet":
-					_pkts[tag.id] = DasPkt(_decode, _props, _rXml);
-					break NEXTPKT;
-				default:
-					throw new StreamException(format(
-						"[%s:%d] Unexpected header element '%s'", _source, 
-						_rXml.front.pos.line, _rXml.front.name
-					));
-				}
-			}
+			switch(_rXml.front.name){
+			case "comment":
+				_rXml.skipContents();
+				continue NEXTPKT;
 
-			// Data
-			if(tag.type == 'd'){
-				if(tag.id !in _pkts)
+			case "properties":
+				mergeProperties(_props, _rXml);
+				continue NEXTPKT;
+
+			case "packet":
+				id = getPktId(_rXml);
+				_pkts[id] = DasPkt(_decode, _props, _rXml);
+				continue NEXTPKT;
+
+			case "d":
+				id = getPktId(_rXml);
+				if(id !in _pkts)
 					throw new StreamException(format(
 						"[%s:%d] Data packet id='%d' received before "~
-						"header packet %s", _source, _rXml.front.pos.line, tag.id
+						"header packet %s", _source, _rXml.front.pos.line, id
 					));
-				if(_rXml.front.type == EntityType.text)
 
-				_pkts[tag.id].setData(cast( const(ubyte)[] ) _rXml.front.text);
-				_curPktId = tag.id;
-				break NEXTPKT;
+				_rXml.popFront();
+				if(_rXml.front.type != EntityType.text)
+					throw new StreamException(format(
+						"[%s:%d] Data packet id='%d' is empty", _source, 
+						_rXml.front.pos.line, id
+					));
+
+				_pkts[id].setData(cast( const(ubyte)[] ) _rXml.front.text);
+
+				break NEXTPKT;  // we have data now
+
+			default:
+				throw new StreamException(format(
+					"[%s:%d] Unexpected header element '%s'", _source, 
+					_rXml.front.pos.line, _rXml.front.name
+				));
 			}
 		}	
 	}
-
 }
 
 InputRange!DasPkt inputPktRange(string sFile){

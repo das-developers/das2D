@@ -26,6 +26,10 @@ struct Units {
 	this(string str){
 		du = Units_fromStr(toStringz(str));
 	}
+
+	this(const(char)[] str){
+		du = Units_fromStr(toStringz(str));	
+	}
 	
 	string toString() const {
 		return to!string(du);
