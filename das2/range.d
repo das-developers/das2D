@@ -202,17 +202,17 @@ unittest {
 
 	InputRange!record_t oF = inputRangeObject(fine_recs);
 	InputRange!record_t oC = inputRangeObject(coarse_recs);
-		
-   foreach(el; prioritySelect([oF, oC])){  // print merged stream
-      write(
-         "Priority: ", el.priority, "  Coord: [", el.cbeg, ", ", el.cend, ")",
-         "  Data: "
-      );
-      foreach(i, member; el.data)
-         if(i > 0) write(", ", member);
-         else write(member);
-      write("\n");
-   }
+	
+	auto r = prioritySelect([oF, oC]);
+	assert(r.front.priority == 5 && r.front.cbeg == -5 && r.front.cend == 5);
+	r.popFront();
+	r.popFront();
+	assert(r.front.priority == 10 && r.front.cbeg == 18 && r.front.cend == 22);
+
+	foreach(i; 0..10) r.popFront();
+	assert(r.front.priority == 5 && r.front.cbeg == 45 && r.front.cend == 55);
+
+	writefln("INFO: das2.range unittest passed");
 }
 
 /******************************************************************************

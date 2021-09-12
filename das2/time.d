@@ -8,6 +8,8 @@ import std.math;
 import core.stdc.string;
 public import std.conv: ConvException;
 
+import das2.util;  // force initilization of libdas2.so/.dll first
+
 import das2c.time;
 import das2c.das1;
 

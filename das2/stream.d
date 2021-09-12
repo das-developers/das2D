@@ -1,12 +1,9 @@
 module das2.stream;
 
-import std.stdio: File, stdout, stderr, writeln;
 import std.format;
 import std.mmfile: MmFile;
 import std.file: exists, isFile;
 import std.experimental.logger;
-import dxml.parser; //parseXML, simpleXML, EntityType, Entity;
-import dxml.dom;    //
 import std.range;
 import std.algorithm: filter;
 import std.format : format;
@@ -16,6 +13,11 @@ import std.typecons: Tuple;
 import std.algorithm: find, endsWith, skipOver;
 import std.system: Endian, endian;
 import std.string: toLower, indexOfAny;
+
+import dxml.parser; //parseXML, simpleXML, EntityType, Entity;
+import dxml.dom;    //
+
+import das2.util;  // force initilization of libdas2.so/.dll first
 
 import das2.time;
 import das2.units;
@@ -57,18 +59,18 @@ struct PktProp{
 }
 
 // Read <properties><p> elements from a dom object
-size_t mergeProperties(PktProp[string] props, DomObj root)
+size_t mergeProperties(PktProp[string] props, DomObj dom)
 {
 	size_t uPropsSet = 0;
 
-	foreach(elProp; root.children){
+	foreach(elProp; dom.children){
 		if(elProp.type != EntityType.elementStart) continue;
 		if(elProp.name != "p") continue;  // Ignore what you don't understand
 
 		string name;
 		PropType type = PropType.STR;
 		foreach(attr; elProp.attributes){
-			if(attr.name == "name"){ name = attr.name.dup; continue;}
+			if(attr.name == "name"){ name = attr.value.dup; continue;}
 			if(attr.name == "type"){
 				switch(attr.value){
 				case "Datum":      type = PropType.DATUM;     break;
@@ -132,11 +134,19 @@ size_t mergeProperties(PktProp[string] props, DomObj root)
 	return uPropsSet;
 }
 
-size_t mergeProperties(PktProp[string] props, XmlStream rXml)
+// Expect to receive a stream stopped at the <properties> element
+// return stream at start on next element (not our end tag )
+size_t mergeProperties(PktProp[string] props, ref XmlStream rXml)
 {
-	auto dom = parseDOM(rXml);
-	auto root = dom.children[0];
-	return mergeProperties(props, root);
+	// TODO: Handle screwed-up das2.2 'type:name="thing"' style properties.
+	// Can't believe I didn't nip that travesty in the bud in 2012. -cwp
+
+	rXml.popFront();
+	if(rXml.front.type == EntityType.elementStart && rXml.front.name == "p"){
+		auto dom = parseDOM(rXml);
+		return mergeProperties(props, dom);
+	}
+	return 0;
 }
 
 /* ************************************************************************* */
@@ -301,7 +311,6 @@ public:
 
 	this(Decode decode, string sPdimName, DomObj elArray)
 	{
-
 		// Cascade down encoding attributes
 		_decode = cascadeDecode(decode, elArray.attributes, elArray.pos.line);
 
@@ -341,7 +350,11 @@ public:
 		// if we're not using variable length stuff, go ahead an initialize the
 		// buffer for storing values
 		if(_decode.blks_per_item != VARIABLE_WIDTH && _items != VARIABLE_ITEMS){
-			_rawdata.length = _decode.blks_per_item * _items;
+			_rawdata.reserve = _decode.blks_per_item * _items;
+		}
+		else{
+			// take a guess
+			_rawdata.reserve = 32;  // Should get most isotime and text values
 		}
 
 		if(_decode.blks_per_item == VARIABLE_WIDTH && _decode.delim.length == 0){
@@ -384,23 +397,29 @@ public:
 		size_t uBlkSz = _decode.bytes_per_blk;
 		size_t uDlmSz = _decode.delim.length;
 		size_t uItemBlks = _decode.blks_per_item;
+		size_t oldlen;
 
 		if(uDlmSz > 0)
-			while(skipOver(_decode.delim, data)){ } // shortens the range
+			while(data.skipOver(_decode.delim)){ } // shortens the range
 
 		if(uItemBlks > 0){
 			size_t uAll = uItemBlks * uBlkSz;
 
+			oldlen = _rawdata.length;
+			_rawdata.length += uAll;
+
 			if(data.length < uAll) return false;
 
 			if(!_decode.swap || uBlkSz == 1){
-				_rawdata[$..$+uAll] = data[0..uAll];  // no swap, copy in all blocks
-				data = data[uAll..$];                 // Shortens the range
+				_rawdata[oldlen..oldlen+uAll] = data[0..uAll]; // all in one go
+				data = data[uAll..$]; // Shortens the range
 			}
 			else{
 				// swap copy each block
 				for(size_t u = 0; u < uItemBlks; ++u){
-					swapCopyN(_rawdata[$ .. $+uBlkSz], data, uBlkSz);
+					size_t u0 = oldlen + u*uBlkSz;
+
+					swapCopyN(_rawdata[u0 .. u0+uBlkSz], data, uBlkSz);
 					data = data[uBlkSz .. $];
 				}
 			}
@@ -414,12 +433,18 @@ public:
 			if(uDlmSz == 0)
 				throw new StreamException("No delimiter set for variable length items");
 
-			while((data.length > uBlkSz) && (data[0..uDlmSz] != _decode.delim)){
+
+			while((data.length >= uBlkSz) && (data[0..uDlmSz] != _decode.delim)){
+
+				// Okay to do this in a loop singe the same array is reused on
+				// subsequent packets ?
+				oldlen = _rawdata.length;
+				_rawdata.length += uBlkSz;
 
 				if(!_decode.swap || uBlkSz == 1) 
-					_rawdata[$ .. $+uBlkSz] = data[0 .. uBlkSz];
+					_rawdata[oldlen .. oldlen+uBlkSz] = data[0 .. uBlkSz];
 				else
-					swapCopyN(_rawdata[$ .. $+uBlkSz], data, uBlkSz);
+					swapCopyN(_rawdata[oldlen .. oldlen+uBlkSz], data, uBlkSz);
 
 				data = data[uBlkSz .. $];  // Shortens the range
 				bItemRead = true;
@@ -437,8 +462,8 @@ public:
 		if(_items != VARIABLE_ITEMS){
 
 			for(size_t u = 0; u < _items; ++u)
-				if(! readItem(data) )
-					throw new StreamException("Data packet too short for array"~_name);	
+				if(! readItem(data) ) throw new StreamException(format(
+					"Data packet too short for array '%s'", _name, ));	
 		}
 		else{
 			// We don't have array row terminators yet, so just read until hit
@@ -573,7 +598,7 @@ public:
 
 	int opCmp(T)(auto ref const T other) if( is(T:DasTime) ){
 		if(_decode.sem_type != SemanticType.TIME)
-			throw new TypeException("None time values can't be compared to a DasTime");
+			throw new TypeException("Non-time values can't be compared to a DasTime");
 		DasTime dt = vtime();
 		return dt.opCmp(other);
 	}
@@ -589,10 +614,12 @@ struct PktDim {
 
 	this(Decode decode, PktProp[string] streamProps, DomObj root){
 
-		auto attr = find!(a=> (a.name == "name"))(root.attributes);
+		_readOrder.reserve = 5;  // typical dims have about 2 arrays
+
+		auto attr = find!(a=> (a.name == "pdim"))(root.attributes);
 		if(attr.empty)
 			throw new StreamException(format(
-				"Physical dimension name missing in element '%s' at %d",
+				"Physical dimension name missing in element '%s' at line %d",
 				root.name, root.pos.line
 			));
 		_name = attr.front.value.dup;
@@ -611,7 +638,7 @@ struct PktDim {
 				if(!attr.empty) usage = attr.front.value.dup;
 				
 				_arrays[usage] = PktAry(decode, _name, el);
-				_readOrder[$] = usage;
+				_readOrder ~= usage;
 			}
 
 			if(el.name == "xcoord" || el.name == "ycoord" ||el.name == "zcoord"){
@@ -626,13 +653,13 @@ struct PktDim {
 	}
 
 	// Initialize PktDim objects using sections of the data
-	const(ubyte)[] setData(const(ubyte)[] _data)
+	const(ubyte)[] setData(const(ubyte)[] data)
 	{
 		for(int i = 0; i < _readOrder.length; ++i){
-			_data = _arrays[_readOrder[i]].setData(_data);
+			data = _arrays[_readOrder[i]].setData(data);
 		}
 
-		return _data;
+		return data;
 	}
 
 	ref PktAry opIndex(string sUsage){
@@ -643,19 +670,27 @@ struct PktDim {
 /* ************************************************************************* */
 
 struct DasPkt {
+	int _id;  // The packet ID
 	PktDim[string] _dims;
 	string[] _readOrder;
 	ubyte[] _delim;
 	Decode _decode;
 
-	this(Decode decode, PktProp[string] props, XmlStream rXml)
+	this(int id, Decode decode, PktProp[string] props, ref XmlStream rXml)
 	{
+		_id = id;
+		_readOrder.reserve = 10; // This is huge, typical packets have like 3 arrays
+
+		_decode = cascadeDecode(decode, rXml.front.attributes, rXml.front.pos.line);
+
+		if(rXml.front.type == EntityType.elementEmpty)
+			throw new StreamException(format(
+				"Packet at line %d has no arrays", rXml.front.pos.line));
+
+		rXml.popFront();  // now at first content
 		auto dom = parseDOM(rXml);
-		auto root = dom.children[0];
 
-		_decode = cascadeDecode(decode, root.attributes, root.pos.line);
-
-		foreach(pdim; root.children){
+		foreach(pdim; dom.children){
 			if(pdim.name == "yset" || pdim.name == "zset" || pdim.name == "wset")
 				throw new StreamException("yset, zset & wset reading not yet implemented");
 
@@ -669,8 +704,8 @@ struct DasPkt {
 			if(attr.empty)
 				throw new StreamException(format("Required attribute 'pdim' missing from element '%s'", pdim.name));
 			
-			_readOrder[$] = attr.front.name.dup;
-			_dims[_readOrder[$-1]] = PktDim( _decode, props, pdim);
+			_readOrder ~= attr.front.value.dup;
+			_dims[_readOrder[$-1]] = PktDim(_decode, props, pdim);
 		}
 	}
 
@@ -691,7 +726,7 @@ struct DasPkt {
 }
 
 /* ************************************************************************* */
-class InputPktRange{
+class DasStream{
 package:
 
 	alias PktTag = Tuple!(int, "id", char, "type");
@@ -708,7 +743,7 @@ package:
 	
 	PktProp[string] _props;
 	DasPkt[int] _pkts;  // Not an array, a map
-	int _curPktId = -1;
+	int _iCurPkt = -1;
 	string _source;     // Save the data source for error reports
 
 	int getPktId(XmlStream rXml){
@@ -724,7 +759,7 @@ package:
 public:
 	this(string sSource){
 		_source = sSource;
-		infof("Reading %s", _source);
+		//infof("Reading %s", _source);
 		_mmfile = new MmFile(_source);
 		_data = cast(const(char)[]) _mmfile[];
 
@@ -736,7 +771,6 @@ public:
 		//else if(_data[0] == '|') _tagtype = binary_var;
 		//else _tagtype = xml;
 
-		// Read the stream header
 		_rXml = parseXML!(simpleXML)(_data);
 
 		if(_rXml.front.name != "stream")
@@ -748,36 +782,52 @@ public:
 			_decode, _rXml.front.attributes, _rXml.front.pos.line
 		);
 
-		// Iterate to next data packet
-		popFront();
+		// Drop down to the first component in the stream, making sure we don't 
+		// have an empty stream
+		if(_rXml.front.type != EntityType.elementEmpty){
+			_rXml.popFront();  // Should be at properties, x, y, z, comment etc.
+
+			// If this is an end tag, we have an empty stream
+			if(_rXml.front.type != EntityType.elementEnd)
+				popFront();
+		}
 	}
 
-	@property bool empty() { return (_curPktId > 0); }
+	@property bool empty() { return (_iCurPkt < 0); }
 
-	@property ref DasPkt front() {return _pkts[_curPktId];}
+	@property ref DasPkt front() {return _pkts[_iCurPkt];}
 
 	void popFront() {
 		int id = 0;
+		_iCurPkt = -1;
 
 		NEXTPKT: while(!_rXml.empty){
-			
-			_rXml.popFront();
 
 			// At this point I should have the start of the next element
 			if(_rXml.empty) break NEXTPKT;
 
+			// The only time the top of the loop should start with the end
+			// of an element is when we close the stream.
+			if(_rXml.front.type == EntityType.elementEnd){
+				_rXml.popFront();  // and now we are done.
+				break NEXTPKT;
+			}
+
 			switch(_rXml.front.name){
 			case "comment":
-				_rXml.skipContents();
+				if(_rXml.front.type == EntityType.elementStart)
+					_rXml.skipContents();
+				else
+					_rXml.popFront();
 				continue NEXTPKT;
 
 			case "properties":
-				mergeProperties(_props, _rXml);
+				mergeProperties(_props, _rXml); // Bumps to next top
 				continue NEXTPKT;
 
 			case "packet":
 				id = getPktId(_rXml);
-				_pkts[id] = DasPkt(_decode, _props, _rXml);
+				_pkts[id] = DasPkt(id, _decode, _props, _rXml);
 				continue NEXTPKT;
 
 			case "d":
@@ -797,7 +847,12 @@ public:
 
 				_pkts[id].setData(cast( const(ubyte)[] ) _rXml.front.text);
 
-				break NEXTPKT;  // we have data now
+				_rXml.popFront();
+				assert(_rXml.front.type == EntityType.elementEnd);
+				_rXml.popFront();
+
+				_iCurPkt = id; 
+				break NEXTPKT;    // we have data now
 
 			default:
 				throw new StreamException(format(
@@ -809,59 +864,38 @@ public:
 	}
 }
 
-InputRange!DasPkt inputPktRange(string sFile){
-	return inputRangeObject(new InputPktRange(sFile));
+InputRange!DasPkt dasStream(string sFile){
+	return inputRangeObject(new DasStream(sFile));
 }
 
 
 unittest{
+	import std.stdio;
 
-struct DataFiles{
+	string[] matching = [
+		"../cdaweb/summary/v1/y79/48s/s48v17934600.dua",
+		"../cdaweb/summary/v1/y79/48s/s48v17935100.dua",
+		"../cdaweb/summary/v1/y79/48s/s48v17935600.dua",
+		"../cdaweb/summary/v1/y79/48s/s48v17936100.dua",
+		"../cdaweb/summary/v1/y80/s48v18000100.dua",
+		"../cdaweb/summary/v1/y80/s48v18000600.dua"
+	];
 
-	DasTime _beg, _end;
-	InputRange!DasPkt _ds;
-	string _indexName;
-	const char[] _index;
-	bool _empty;
-	string _file;
+	auto beg = DasTime("1979-350");
+	auto end = DasTime("1980-010");
 
-	this(string sIndex, DasTime dtBeg, DasTime dtEnd)
-	{
-		_indexName = sIndex; _beg = dtBeg; _end = dtEnd;
+	auto d2s_xml_file = "./test/vg1_mag_hg_48s_index.xml";
 
-		auto ipr = new InputPktRange(sIndex); // Public radio is useful
+	auto stream = new DasStream(d2s_xml_file);
 
-		// Get a das packet stream filtered on our time range, for files 
-		// that actually exist on disk
-		_ds = ipr
-			.filter!(p => p["time", "min"] < _end && p["time", "max"] > _beg)
-			.inputRangeObject;
+	auto filtered_stream = stream
+		.filter!(pkt => pkt["time", "min"] < end && pkt["time", "max"] > beg);
 
-		if(!_ds.empty){
-			_file = _ds.front["rel_path"].vchar;
-		}
+	int i = 0;
+	foreach(pkt; filtered_stream){
+		assert(pkt["rel_path"].vchar == matching[i]);
+		++i;
 	}
 
-	@property bool empty()  { return _ds.empty; }
-	@property string front() return { return _file; }
-
-	void popFront(){
-		_ds.popFront();
-		if(!_ds.empty){
-			_file = _ds.front["rel_path"].vchar;
-		}
-	}
-}
-
-DasTime beg = DasTime("1979-063");
-DasTime end = DasTime("1979-079");
-
-string sIndex = "./test/vg1_mag_hg_48s_index.xml";
-
-foreach(el; DataFiles(sIndex, beg, end)){
-	writeln("File: ", el, " is in range");
-		
-}
-
-
+	writefln("INFO: das2.stream unittest passed");
 }
