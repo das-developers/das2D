@@ -759,7 +759,8 @@ package:
 public:
 	this(string sSource){
 		_source = sSource;
-		//infof("Reading %s", _source);
+		infof("Reading %s", _source);
+		isFile(_source);  // throw file exception if not readable
 		_mmfile = new MmFile(_source);
 		_data = cast(const(char)[]) _mmfile[];
 
