@@ -184,7 +184,7 @@ struct DasTime{
 		return aBuf.idup[0..strlen(aBuf.ptr)];
 	}
 
-	int opCmp(ref const(DasTime) other) const {
+	int opCmp()(auto ref const(DasTime) other) const {
 		return dt_compare(&dt, &(other.dt));
 	}
 	
