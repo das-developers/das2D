@@ -178,31 +178,50 @@ unittest {
 	import std.stdio;      // gets: write
 
 	
-	alias record_t = Tuple!(
-		Tuple!(int,int), "data",
-		int, "cbeg", 
-		int, "cend", 
-		int, "priority"
-	);
+	struct data_t {
+		double x;
+		int y;
+	}
 
-	auto fine_recs = zip(iota(20, 40, 2), generate!(() => uniform(0, 128)))
+	struct record_t {
+		data_t data;
+		double cbeg;
+		double cend; 
+		int priority;
+	}
+
+	// High resolution data spaced 2 appart
+	auto fine_recs = zip(iota(120.0f, 140.0f, 2.0f).array, generate!(() => uniform(0, 128)))
 		.map!(
-			el => tuple!("data", "cbeg", "cend", "priority")(
-				el, el[0] - 2, el[0] + 2, 10
-			)
+			el => record_t(data_t(el[0], el[1]), el[0] - 1.0, el[0] + 1.0, 10)
 		);
 	
    // Generate an array of low-resolution records (spaced 10 apart)
-   auto coarse_recs = zip(iota(0, 100, 10), generate!(() => uniform(0, 128)))
+   auto coarse_recs = zip(iota(100.0f, 200.0f, 10.0f).array, generate!(() => uniform(0, 128)))
 		.map!(
-			el => tuple!("data", "cbeg", "cend", "priority")(
-				el, el[0] - 5, el[0] + 5, 5
-			)
+			el => record_t(data_t(el[0], el[1]), el[0] - 5.0, el[0] + 5.0, 5)
+		);
+
+	// Generate an array of ultra low-resolution records (spaced 25 apart)
+   auto summary_recs = zip(iota(0, 400, 25).array, generate!(() => uniform(0, 128)))
+		.map!(
+			el => record_t(data_t(el[0], el[1]), el[0] - 12.5, el[0] + 12.5, 1)
 		);
 
 	InputRange!record_t oF = inputRangeObject(fine_recs);
 	InputRange!record_t oC = inputRangeObject(coarse_recs);
+	InputRange!record_t oS = inputRangeObject(summary_recs);
 	
+	
+	foreach(el; prioritySelect([oF, oC, oS])){  // print merged stream
+	   writefln(
+	      "Priority: %2d  Width: %2.0f  Coord: [%3.1f, %3.1f)  Data [%s, %s]",
+	      el.priority, el.cend - el.cbeg, el.cbeg, el.cend, el.data.x , el.data.y
+	   );
+	}
+
+
+	/*
 	auto r = prioritySelect([oF, oC]);
 	assert(r.front.priority == 5 && r.front.cbeg == -5 && r.front.cend == 5);
 	r.popFront();
@@ -211,6 +230,7 @@ unittest {
 
 	foreach(i; 0..10) r.popFront();
 	assert(r.front.priority == 5 && r.front.cbeg == 45 && r.front.cend == 55);
+*/
 
 	writefln("INFO: das2.range unittest passed");
 }
