@@ -836,7 +836,7 @@ public:
 				if(id !in _pkts)
 					throw new StreamException(format(
 						"[%s:%d] Data packet id='%d' received before "~
-						"header packet %s", _source, _rXml.front.pos.line, id
+						"header packet", _source, _rXml.front.pos.line, id
 					));
 
 				_rXml.popFront();
