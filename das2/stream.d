@@ -183,7 +183,7 @@ private struct Decode {
 	bool mergedelim = true;  // multiple spaces treated as single space
 	string lang = "en";      // default language to assume for properties
 
-version(BegEndian){
+version(BigEndian){
 	bool swap = true;       // true if byte swapping is needed for a value type
 }
 else{
@@ -209,7 +209,7 @@ private Decode cascadeDecode(AR)(Decode decode, AR rAttributes, int nLineNo)
 	// The default for das2.3/basic streams is little endian, if you're a big
 	// endian machine, just assume you're going to need to swap values unless
 	// told otherwise
-version(BegEndian){
+version(BigEndian){
 	_decode.swap = true;
 }
 else{
@@ -276,7 +276,7 @@ else{
 			break;
 
 		case "byteorder":
-version(BegEndian){
+version(BigEndian){
 			if(attr.value == "BE") decode.swap = false;
 }
 else{
