@@ -709,6 +709,8 @@ struct DasPkt {
 		}
 	}
 
+	@property int id() const { return _id;} 
+
 	// Initialize PktDim objects using sections of the data
 	void setData(const(ubyte)[] _data)
 	{
