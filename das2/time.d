@@ -2,8 +2,6 @@ module das2.time;
 
 
 import std.string;
-import std.datetime;
-import core.time;
 import std.math;
 import core.stdc.string;
 public import std.conv: ConvException;
@@ -12,6 +10,8 @@ import das2.util;  // force initilization of libdas2.so/.dll first
 
 import das2c.time;
 import das2c.das1;
+
+import std.datetime: SysTime;
 
 /**************************************************************************
  * Parse a string representing a UTC time into a SysTime object D's
@@ -27,6 +27,8 @@ import das2c.das1;
 SysTime parsetime(string s){
 	// A wart to get buy, make this a UTF-8 safe version of larry's parsetime
 	// someday.
+	import core.time: Duration, dur;  // hide import locally to avoid conflicts with .seconds
+	import std.datetime: DateTime, DateTimeException, TimeZone, UTC;
 
 	const char* c_str = s.toStringz();
 
@@ -160,6 +162,10 @@ struct DasTime{
 		dt_tnorm(&dt);
 	}
 
+	this(const ref das_time dtOther){
+		dt = dtOther;
+	}
+
 	string isoc(int fracdigits = 0) const{
 		char[64] aBuf = '\0';
 		dt_isoc(aBuf.ptr, 63, &dt, fracdigits);
@@ -198,14 +204,14 @@ struct DasTime{
 	DasTime opBinary(string op)(double other) const {
 		static if(op == "+"){
 			das_time dt_new = dt;
-			dt_new.seconds += other;
-			dt_norm(dt_new);
+			dt_new.second += other;
+			dt_tnorm(&dt_new);
 			return DasTime(dt_new);
 		}
 		else static if(op == "-"){
 			das_time dt_new = dt;
-			dt_new.seconds -= other;
-			dt_norm(dt_new);
+			dt_new.second -= other;
+			dt_tnorm(&dt_new);
 			return DasTime(dt_new);
 		}
 		else static assert(false, "Operator "~op~" not implemented");
