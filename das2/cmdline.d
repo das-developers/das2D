@@ -14,6 +14,8 @@ import std.regex:     regex, splitter;
 
 import dxml.util:     encodeText;
 
+import das2.log:      errorf;
+
 // Code from terminal.d by Adam Druppe.
 version(Posix){
 	struct winsize {
