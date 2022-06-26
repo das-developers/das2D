@@ -3,7 +3,6 @@ module das2.stream;
 import std.format;
 import std.mmfile: MmFile;
 import std.file: exists, isFile;
-import std.experimental.logger;
 import std.range;
 import std.algorithm: filter;
 import std.format : format;
@@ -21,6 +20,7 @@ import das2.util;  // force initilization of libdas2.so/.dll first
 
 import das2.time;
 import das2.units;
+import das2.log;
 import das2c.tt2000: das_tt2K_to_utc;
 
 alias XmlStream = EntityRange!(simpleXML, const(char)[]);
@@ -221,7 +221,7 @@ else{
 		switch(attr.name){
 		case "version":
 			if(attr.value != "2.3/basic-xml")
-				errorf("Unknown stream version '%s' this might not go well", attr.value);
+				warnf("Unknown stream version '%s' this might not go well", attr.value);
 			break;
 
 		case "encode":

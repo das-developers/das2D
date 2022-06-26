@@ -1,5 +1,5 @@
-/* Copyright (C) 2004-2017 Jeremy Faden <jeremy-faden@uiowa.edu>
- *                         Chris Piker <chris-piker@uiowa.edu>
+/* Copyright (C) 2004-2006 Jeremy Faden <jeremy-faden@uiowa.edu>
+ *               2012-2017 Chris Piker <chris-piker@uiowa.edu>
  *
  * This file is part of libdas2, the Core Das2 C Library.
  *
