@@ -4,8 +4,8 @@
 
 module das2.pktbuf;
 
-enum DasStreamVer { V22=220, V23basic=230};
-enum DasTagType  { Hs = 0, Hx = 1, Dx = 2};
+enum DasStreamVer { V22=220, V30=300};
+enum DasTagType  { Sx = 0, Hx = 1, Pd = 2};
 
 /+ Structure to hold a stack buffer and and track write points
  +
@@ -35,15 +35,10 @@ struct DasPktBuf(size_t buf_sz = 65536, DasStreamVer SV = DasStreamVer.V22 )
 	}
 	*/
 
-	static if( SV == DasStreamVer.V22){	
-		void tag(DasTagType tt, ushort id=0){
-			_tt = tt; _pktId = id;
-		}
+	void tag(DasTagType tt, ushort id=0){
+		_tt = tt; _pktId = id;
 	}
-	else{
-		static assert(false, "Das2/v2.3 basic streams are not yet supported");
-	}
-
+	
 	/+ Write data to the buffer.  Binary items are written as little endian
 	 + by default, but this can be set via template parameter.  For strings
 	 + the encoding is ignored.
@@ -55,13 +50,11 @@ struct DasPktBuf(size_t buf_sz = 65536, DasStreamVer SV = DasStreamVer.V22 )
 	   
 		foreach(I, arg; args){
 			
-			static if(SV == DasStreamVer.V22){
-				static assert( 
-					is(T[I] == float) || is(T[I] == double) || is(T[I] : const(ubyte)[]) ||
-					is(T[I] == float[]) || is(T[I] == double[]) , 
-					"Type " ~ T[I].stringof ~ " is not supported for das2/v2.2 streams"
-				);
-			}
+			static assert( 
+				is(T[I] == float) || is(T[I] == double) || is(T[I] : const(ubyte)[]) ||
+				is(T[I] == float[]) || is(T[I] == double[]) , 
+				"Type " ~ T[I].stringof ~ " is not supported for das v2.2 streams"
+			);
 			
 			// Each arg can be a single item, or an array of items.
 			static if( isArray!(T[I])){
@@ -100,13 +93,14 @@ struct DasPktBuf(size_t buf_sz = 65536, DasStreamVer SV = DasStreamVer.V22 )
 			char[] tag;
 			//char[] slice = tag_buf[];
 			static if(SV == DasStreamVer.V22){
-				if(_tt != DasTagType.Dx)
+				if(_tt != DasTagType.Pd)
 					tag = sformat!"[%02u]%06d"(buf[], _pktId, _iMsgWrite - _iMsgBeg);
 				else
 					tag = sformat!":%02u:"(buf[], _pktId);
 			}
 			else{
-				static assert(SV == DasStreamVer.V22, "Das2/v2.3 packet tags not yet supported");
+				// All das v3 tags use the same format
+				tag = sformat!"|%s|%d|%d|"(buf[], _tt, _pktId, _iMsgWrite - _iMsgBeg);
 			}
 
 			_nTagLen = tag.length;
