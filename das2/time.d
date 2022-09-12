@@ -1,10 +1,12 @@
 module das2.time;
 
-
-import std.string;
-import std.math;
-import core.stdc.string;
 public import std.conv: ConvException;
+
+import core.stdc.string;
+
+import std.format: format;
+import std.math;
+import std.string: lastIndexOf, toStringz;
 
 import das2.util;  // force initilization of libdas2.so/.dll first
 
@@ -172,6 +174,48 @@ struct DasTime{
 		return aBuf.idup[0..strlen(aBuf.ptr)];
 	}
 
+	/++ Return an ISO-8601 day of month string with all unnecessary time
+	 + components removed.  Will always retain at least the date part.
+	 + The minutes part is retained *IF* the hours are no zero.  This is
+	 + because many parsers look for at least ':' to find a time component.
+	 + 
+	 +  Examples:
+	 +    2022-07-19T17:43:35.345789 -> 2022-07-19T17:43:35.345789
+	 +    2022-07-19T17:43:35.340000 -> 2022-07-19T17:43:35.34
+	 +    2022-07-19T17:43:35.000000 -> 2022-07-19T17:43:35
+	 +    2022-07-19T17:43:00.000000 -> 2022-07-19T17:43
+	 +    2022-07-19T17:00:00.000000 -> 2022-07-19T17:00  <-- not a typo
+	 +    2022-07-19T00:00:00.000000 -> 2022-07-19
+	 +/
+	string isoShort() const{
+		string s = isoc(9);
+
+		// Maybe trim sub-seconds
+		long iDot = lastIndexOf(s, '.');
+		assert(iDot > 0); // Unless something radically changes we can depend on this
+		long iEnd = s.length - 1;
+		while(iEnd > iDot){
+			if(s[iEnd] == '0') --iEnd;
+			else break;
+		}
+		if(s[iEnd] == '.')
+			--iEnd; // Nix trailing '.' if no longer needed
+		else
+			return s[0..iEnd+1]; // have some sub-seconds
+
+		// Maybe trim seconds
+		if((s[iEnd-1] == '0') && (s[iEnd] == '0'))
+			iEnd -= 3;
+		else
+			return s[0..iEnd+1]; // have seconds
+
+		// Trim time of day
+		if((s[iEnd-4]=='0') && (s[iEnd-3]=='0') && (s[iEnd-1]=='0') && (s[iEnd]=='0'))
+			iEnd -= 6;
+		
+		return s[0..iEnd+1];
+	}
+
 	string toString() const{ return isoc(6); } 
 
 	void norm(){
@@ -217,3 +261,30 @@ struct DasTime{
 		else static assert(false, "Operator "~op~" not implemented");
 	}
 };
+
+unittest{
+
+	import std.stdio;
+
+	string[] aExpect = [
+		"2022-07-19T17:43:35.345789", "2022-07-19T17:43:35.345789",
+		"2022-07-19T17:43:35.340000", "2022-07-19T17:43:35.34",
+		"2022-07-19T17:43:35.000000", "2022-07-19T17:43:35",
+		"2022-07-19T17:43:00.000000", "2022-07-19T17:43",
+		"2022-07-19T17:00:00.000000", "2022-07-19T17:00", // <-- not a typo
+		"2022-07-19T00:00:00.000000", "2022-07-19"
+	];
+
+	DasTime dt;
+	string sTest;
+	for(int i = 0; i < aExpect.length/2; ++i){
+		dt = DasTime(aExpect[2*i]);
+
+		sTest = dt.isoShort();
+		assert(sTest == aExpect[2*i+1], format!"ISO-shorten %s, expect %s, got %s"(
+			aExpect[2*i], aExpect[2*i+1], sTest
+		));
+		writefln("INFO: %s --> %s", aExpect[2*i], sTest);
+	}
+	writefln("INFO: das2.time unittest passed");
+}

@@ -75,7 +75,7 @@ struct Units {
 	
 	/++ Encode a broken down das2 Time as an epoch time in these units 
 	 +/
-	double convert(ref const(DasTime) t) const {
+	double convert()(auto ref const(DasTime) t) const {
 		return Units_convertFromDt(du, &(t.dt));
 	}
 	
