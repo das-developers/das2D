@@ -573,10 +573,10 @@ void writeStreamHeader(StreamFmt SF)()
 	DasPktBuf!(128, SF) pktBuf;
 	pktBuf.tag(TagType.Sx);
 	static if(SF == StreamFmt.v30){
-		pktBuf.write("\n<stream version=\"3.0\" type=\"das-basic-stream\" />\n");
+		pktBuf.write("\n<stream version=\"3.0\" type=\"das-basic-stream\" />\n".r);
 	}
 	else{
-		pktBuf.write("<stream version=\"2.2\" />\n");
+		pktBuf.write("<stream version=\"2.2\" />\n".r);
 	}
 	pktBuf.bytes.copy(stdout.lockingBinaryWriter);
 }
@@ -594,17 +594,17 @@ int writeException(StreamFmt SF)(StreamExc et, string sMsg)
 	auto sSafeMsg = encodeText( sMsg );
 	
 	if(SF == StreamFmt.v30){
-		pPkt ~= format!"\n<exception type=\"%s\">\n%s\n</exception>"(et.toString!SF(), sSafeMsg);
+		pPkt ~= format!"\n<exception type=\"%s\">\n%s\n</exception>\n"(et.toString!SF(), sSafeMsg);
 		pTag = sformat!"|Ex||%d|"(aTag[], pPkt.length);
 	}
 	else{
-		pPkt ~= format!"<exception type=\"%s\" message=\"%s\" />"(et.toString!SF(), sSafeMsg);
+		pPkt ~= format!"<exception type=\"%s\" message=\"%s\" />\n"(et.toString!SF(), sSafeMsg);
 		pTag = sformat!"[XX]%06d"(aTag[], pPkt.length);
 	}
+
+	pTag.copy(stdout.lockingBinaryWriter);
+	pPkt.copy(stdout.lockingBinaryWriter);
 		
-	errorf("ERROR: %s", sMsg);
+	errorf("%s", sMsg.strip());
 	return 13;
 }
-
-
-

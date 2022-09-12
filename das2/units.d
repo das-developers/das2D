@@ -264,6 +264,7 @@ shared static this()
 	UNIT_T1970  = cast(immutable) Units(das2c.units.UNIT_T1970);
 	UNIT_NS1970 = cast(immutable) Units(das2c.units.UNIT_NS1970);
 	UNIT_UTC    = cast(immutable) Units(das2c.units.UNIT_UTC);
+	UNIT_TT2000 = cast(immutable) Units(das2c.units.UNIT_TT2000);
 
 	UNIT_SECONDS      = cast(immutable) Units(das2c.units.UNIT_SECONDS);
 	UNIT_HOURS        = cast(immutable) Units(das2c.units.UNIT_HOURS);
