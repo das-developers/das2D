@@ -290,11 +290,24 @@ struct DasPktBuf(size_t buf_sz = 65536, StreamFmt SV = StreamFmt.V30 )
 		foreach(I, arg; args){
 			
 			static if(SV == StreamFmt.v22){
-				static assert( 
-					is(T[I] == float) || is(T[I] == double) || is(T[I] : const(ubyte)[]) ||
-					is(T[I] == float[]) || is(T[I] == double[]) , 
+				// das v2 supports encoding:
+				//    arrays of ubytes (essentially pass through), arrays of floats,
+				//    arrays of doubles (and single elements of each)
+				// It does not support integers of any sort
+				static if( isArray!(T[I])){
+					static assert(
+					is(ElementType!(T[I]) : float)  || 
+					is(ElementType!(T[I]) : double) ||
+					is(ElementType!(T[I]) : ubyte), 
+					"Type " ~ ElementType!(T[I]).stringof ~ " is not supported for das v2.2 streams"
+					);
+				}
+				else{
+					static assert( 
+					is(T[I] : float) || is(T[I] : double) || is(T[I] : const(ubyte)[]), 
 					"Type " ~ T[I].stringof ~ " is not supported for das v2.2 streams"
-				);
+					);
+				}
 			}
 			
 			// Each arg can be a single item, or an array of items.
@@ -559,7 +572,7 @@ void writeStreamHeader(StreamFmt SF)(auto ref Property[] aProp)
 	else {
 		pPkt ~= "<stream version=\"2.2\" >\n  <properties\n".r;
 		pPkt ~= aProp.map!( prop => prop.toString!SF()).join("\n    ").r;
-		pPkt ~= "\n  >\n</stream>\n";
+		pPkt ~= "\n  />\n</stream>\n";
 
 		pTag = sformat!"[00]%06d"(aTag[], pPkt.length);
 	}
