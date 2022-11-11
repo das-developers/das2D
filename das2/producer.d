@@ -612,7 +612,7 @@ int writeException(StreamFmt SF)(StreamExc et, string sMsg)
 	}
 	else{
 		pPkt ~= format!"<exception type=\"%s\" message=\"%s\" />\n"(et.toString!SF(), sSafeMsg);
-		pTag = sformat!"[XX]%06d"(aTag[], pPkt.length);
+		pTag = sformat!"[xx]%06d"(aTag[], pPkt.length);
 	}
 
 	pTag.copy(stdout.lockingBinaryWriter);
