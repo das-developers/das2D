@@ -33,3 +33,6 @@ public import das2c.utf8;
 public import das2c.util;
 public import das2c.value;
 public import das2c.variable;
+version(spice){
+	public import das2c.spice;
+}

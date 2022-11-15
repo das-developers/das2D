@@ -1,6 +1,7 @@
 build.*
 .dub
 das2-test-library
+das2-test-spice
 generated-docs
 dub.selections.json
 
