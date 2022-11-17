@@ -220,7 +220,7 @@ private S _breakNrap(S)(
 alias BE = Endian.bigEndian;
 alias LE = Endian.littleEndian;
 
-enum TagType   {INVALID=0, Sx = 1, Hx = 2, Pd = 3 };
+enum TagType {INVALID=0, Sx = 1, Hx = 2, Pd = 3, Cx = 4, Ex = 5, XX = 6 };
 
 // Das stream exception types (move this somewhere else)
 enum StreamExc{ Query, Server, NoData };

@@ -54,4 +54,5 @@ enum DAS2_EXCEPT_SERVER_ERROR        = "ServerError";
  */
 int das_send_spice_err(int nDasVer, const char* sErrType);
 
+
 }

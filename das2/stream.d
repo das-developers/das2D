@@ -50,7 +50,7 @@ enum PropType {STR, DATUM, BOOL, INTEGER, REAL, DATUM_RNG, REAL_RNG};
 
 /++ Items have a intrinsic encoding, but also a semantic meaning.  For example
  + the string "2019-001T14:00" is a 14-byte array, but it is also a UTC time
- + and should be comparable to other times.   
+ + and should be comparable to other times.
  +/
 struct PktProp{
 	PropType type = PropType.STR;
