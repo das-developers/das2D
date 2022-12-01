@@ -120,12 +120,6 @@ string rpwgString(SysTime st, int nSecPrec = 0){
 struct DasTime{
 	das_time dt = {0, 1, 1, 1, 0, 0, 0.0};
 	
-	/** Construct a time value using a string */
-	this(const(char)[] s){
-		if(!dt_parsetime(s.toStringz(), &dt))
-			throw new ConvException(format("Error parsing %s as a date-time", s));
-	}
-	
 	/* pull-up properties of dt to this level */
 	@property int    year()   const{ return dt.year;   }
 	@property int    month()  const{ return dt.month;  }
@@ -143,6 +137,18 @@ struct DasTime{
 	@property void second(double n){ dt.second = n; }
 		
 	bool valid(){ return dt.month != 0;}
+
+	/** Construct a time value using a string */
+	this(const(char)[] s){
+		// Allow now as a time
+		if(s == "now"){
+			dt_now(&dt);
+		}
+		else{
+			if(!dt_parsetime(s.toStringz(), &dt))
+				throw new ConvException(format("Error parsing %s as a date-time", s));
+		}
+	}
 
 	/** Create a time using a vairable length tuple.
 	 * 
