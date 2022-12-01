@@ -250,7 +250,7 @@ string toString(StreamFmt SV)(StreamExc et){
  +
  + This is a stack memory optimized writer.  A single buffer is used
  + for each instance of this structure. +/
-struct DasPktBuf(size_t buf_sz = 65536, StreamFmt SV = StreamFmt.V30 )
+struct PktBuf(size_t buf_sz = 65536, StreamFmt SV = StreamFmt.V30 )
 {
 	ubyte[buf_sz] _buf;        
 	/* Leave room for a tag with 2 tag bytes, 4 pipe bytes, 10 len bytes
@@ -372,6 +372,16 @@ struct DasPktBuf(size_t buf_sz = 65536, StreamFmt SV = StreamFmt.V30 )
 		}
 		return _buf[_iMsgBeg - _nTagLen .. _iMsgWrite];
 	}
+
+	/+ Send the contents of the packet to the destination file, call it's
+	 + flush() method, and clear the buffer.
+	 + NOTE: This *also* clears the packet tag!
+	 +/
+	void send(File dest){
+		dest.write(bytes());
+		dest.flush();
+		clear();
+	}
 }
 
 /* Common packet emits **************************************************** */
@@ -449,7 +459,8 @@ struct Property{
 	}
 
 	this(string n, long a, long b, Units u = UNIT_DIMENSIONLESS){
-		type = PropType.INT_RNG; name = n; units = u;
+		type = PropType.INT_RNG; 
+		name = n; units = u;
 		value = format!("%s to %s")(to!string(a), to!string(b));
 	}
 	
@@ -459,7 +470,7 @@ struct Property{
 	}
 	
 	this(string n, DasTime a, DasTime b, Units u = UNIT_DIMENSIONLESS){
-		type = PropType.DATETIME; name = n; units = u;
+		type = PropType.DATETIME_RNG; name = n; units = u;
 		value = format!("%s to %s")(a.isoShort(), b.isoShort());
 	}
 
@@ -508,13 +519,17 @@ struct Property{
  		}
  		else{
  			switch(type){
-	 		case PropType.BOOL:         sType = "bool";          break;
- 			case PropType.DATETIME:     sType = "datetime";      break;
- 			case PropType.DATETIME_RNG: sType = "datetimeRange"; break;
- 			case PropType.INT:          sType = "int";           break;
- 			case PropType.INT_RNG:      sType = "intRange";      break;
- 			case PropType.REAL:         sType = "real";          break;
- 			case PropType.REAL_RNG:     sType = "realRange";     break;
+	 		case PropType.BOOL:         sType = "boolean";       break;
+ 			case PropType.DATETIME:     sType = "Time";          break;
+ 			case PropType.DATETIME_RNG: sType = "TimeRange";     break;
+ 			case PropType.INT:
+ 				sType = (units == UNIT_DIMENSIONLESS) ? "int" : "Datum";
+ 				break;
+ 			case PropType.INT_RNG:      sType = "DatumRange";    break;
+ 			case PropType.REAL:
+ 				sType = (units == UNIT_DIMENSIONLESS) ? "double" : "Datum";
+ 				break;
+ 			case PropType.REAL_RNG:     sType = "DatumRange";    break;
  			default: break;
  			}
 
@@ -579,11 +594,12 @@ void writeStreamHeader(StreamFmt SF)(auto ref Property[] aProp)
 
 	pTag.copy(stdout.lockingBinaryWriter);
 	pPkt.copy(stdout.lockingBinaryWriter);
+	stdout.flush();
 }
 
 void writeStreamHeader(StreamFmt SF)()
 {
-	DasPktBuf!(128, SF) pktBuf;
+	PktBuf!(128, SF) pktBuf;
 	pktBuf.tag(TagType.Sx);
 	static if(SF == StreamFmt.v30){
 		pktBuf.write("\n<stream version=\"3.0\" type=\"das-basic-stream\" />\n".r);
@@ -592,6 +608,7 @@ void writeStreamHeader(StreamFmt SF)()
 		pktBuf.write("<stream version=\"2.2\" />\n".r);
 	}
 	pktBuf.bytes.copy(stdout.lockingBinaryWriter);
+	stdout.flush();
 }
 
 int writeException(StreamFmt SF)(StreamExc et, string sMsg)
@@ -617,6 +634,7 @@ int writeException(StreamFmt SF)(StreamExc et, string sMsg)
 
 	pTag.copy(stdout.lockingBinaryWriter);
 	pPkt.copy(stdout.lockingBinaryWriter);
+	stdout.flush();
 		
 	errorf("%s", sMsg.strip());
 	return 13;
