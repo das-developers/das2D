@@ -6,7 +6,6 @@
 		"dxml": "*"
 	},
 	"description": "D bindings for the das2 C library",
-	"authors": ["Chris Piker"],
 	"license": "MIT",
 	"name": "das2",
 	"homepage": "https://github.com/das-developers/das2D",
@@ -27,7 +26,7 @@
 		{
 			"name":"spice",
 			"targetType":"sourceLibrary",
-			"version":["spice"],
+			"versions":["spice"],
 			"libs":[
 				"fftw3",  "expat", "ssl", "crypto", "z", "m", "pthread"
 			],
