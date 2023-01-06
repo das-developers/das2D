@@ -677,11 +677,11 @@ int writeException(StreamFmt SF)(StreamExc et, string sMsg)
  +
  + // Write L0 (non calibrated data)
  + PktBuf(800, StreamFmt.v30) packet;
- + packet.write(pDat.seqNo, pDat.rawTemp);
+ + packet.write(seqNo(pDat), rawTemp(pDat));
  +
  + // Write L1 (calibrated data using polynomial set)
  + CalReader celsius = CalReader(rawTemp, [26.4, 20.0], "°C");
- + packet.write(pDat.celcius);
+ + packet.write(celcius(pDat));
  + --------------
  +
  +/
@@ -747,7 +747,7 @@ struct BitReader(StreamFmt SF = StreamFmt.v30){
 		this.title = title;
 	}
 
-	/++ Since das3 stream values are never smaller then 1-byte, return the 
+	/++ Since das3 stream values are never smaller than 1-byte, return the 
 	 + bit field as a byte array, with the proper endianness +/
    ubyte[] opCall(ubyte[] pIn){
 
@@ -833,5 +833,4 @@ unittest{
 	BitReader!SF flag = BitReader!SF("flag", 1, 3, "ubyte", 1, "bool" );
 
 	auto aRet = flag(aSrc[]);
-
 }
