@@ -275,10 +275,16 @@ string toString(StreamFmt SV)(StreamExc et){
 /+ Structure to hold a stack buffer and and track write points
  +
  + This is a stack memory optimized writer.  A single buffer is used
- + for each instance of this structure. +/
+ + for each instance of this structure.
+ + 
+ + Params:
+ +    buf_sz = The max number of bytes required by a single packet, don't 
+ +             make this too big or you'll get a stack overflow.  An 
+ +             additional 48 bytes are reserved for the packet tag.
+ +/
 struct PktBuf(size_t buf_sz = 65536, StreamFmt SV = StreamFmt.v30 )
 {
-	ubyte[buf_sz] _buf;        
+	ubyte[buf_sz + 48] _buf;        
 	/* Leave room for a tag with 2 tag bytes, 4 pipe bytes, 10 len bytes
 	   and 32 tag bytes, for a total of 48 bytes. */
 	immutable(size_t) _iMsgBeg = 48;
