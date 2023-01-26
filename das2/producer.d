@@ -35,8 +35,11 @@ import dxml.util:     encodeText;
 import das2.log:      errorf;
 import das2.time:     DasTime;
 import das2.units:    Units, UNIT_DIMENSIONLESS;
+import das2c.value:   DAS_FILL_VALUE;
 
 private alias r = representation;
+
+enum FLOAT_FILL = to!float(DAS_FILL_VALUE);
 
 /* Basic stream definitions *********************************************** */
 
@@ -68,7 +71,7 @@ enum TagType {INVALID=0, Sx = 1, Hx = 2, Pd = 3, Cx = 4, Ex = 5, XX = 6 };
  +     das-basic-stream-v3.0.xsd  
  +  which is the authoritative upstream source.
  +/
-private enum ValueType {UNKNOWN, BOOL, DATETIME, INT, REAL, STRING };
+enum ValueType {UNKNOWN, BOOL, DATETIME, INT, REAL, STRING };
 
 
 /* Reader command line assistance ***************************************** */
