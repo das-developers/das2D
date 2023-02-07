@@ -945,7 +945,7 @@ RawPkt readTaggedPkts(PTR)(ref PTR pSrc)
 		return tRet;
 	// Type tag is not 2 bytes long, or data length is not more then 10 chars long 
 	// or less then 1 char long
-	if(((aPipes[1] - aPipes[0]) != 3)||((aPipes[3] - aPipes[1]) < 2)||
+	if(((aPipes[1] - aPipes[0]) != 3)||((aPipes[3] - aPipes[2]) < 2)||
 		((aPipes[3] - aPipes[2]) > 11)
 	){
 		throw new DasException("Maleformed packet tag");
