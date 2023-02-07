@@ -937,9 +937,9 @@ RawPkt readTaggedPkts(PTR)(ref PTR pSrc)
 	while((nSet < 4)&&(uPos < pSrc.length)){
 		if(pSrc[uPos] == cast(byte)'|'){
 			aPipes[nSet] = uPos;
+			nSet += 1;
 		}
 		uPos += 1;
-		nSet += 1;
 	}
 	if(nSet < 4)  // Couldn't get 4 pipes before hitting the end of the file
 		return tRet;
@@ -951,7 +951,7 @@ RawPkt readTaggedPkts(PTR)(ref PTR pSrc)
 		throw new DasException("Maleformed packet tag");
 	}
 	// See if we recognize the tag
-	string sTag = to!string( pSrc[ aPipes[0]+1 .. aPipes[1]] );
+	string sTag = cast(string) pSrc[ aPipes[0]+1 .. aPipes[1] ] ;
 	switch(sTag){
 	case "Sx": tRet.tag = TagType.Sx; break;
 	case "Hx": tRet.tag = TagType.Hx; break;
@@ -964,7 +964,7 @@ RawPkt readTaggedPkts(PTR)(ref PTR pSrc)
 	}
 	// Okay, now get the packet ID
 	if((aPipes[2] - aPipes[1]) > 1){
-		string _buf = to!string(pSrc[ aPipes[1]+1 .. aPipes[2] ]);
+		string _buf = cast(string) pSrc[ aPipes[1]+1 .. aPipes[2] ];
 		string sId = _buf.strip();
 		try{
 			tRet.id = to!ushort(sId);
@@ -976,7 +976,7 @@ RawPkt readTaggedPkts(PTR)(ref PTR pSrc)
 	// Get the length
 	ulong uLen;
 	try{
-		string _buf = to!string(pSrc[ aPipes[2]+1 .. aPipes[3]]);
+		string _buf = cast(string) pSrc[ aPipes[2]+1 .. aPipes[3]];
 		uLen = to!ulong( to!int(_buf.strip() ));
 	}
 	catch(ConvException ex){
