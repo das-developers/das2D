@@ -20,9 +20,10 @@ import std.array:     appender, join;
 import std.bitmanip:  write;
 import std.conv:      ConvException, to;
 import std.exception: enforce;
+import std.file:      exists, isFile;
 import std.format:    format, sformat;
 import std.getopt:    getopt, config, GetoptResult, Option;
-import std.range:     ElementType;
+import std.range:     ElementType, isInputRange;
 import std.regex:     regex, splitter;
 import std.stdio:     File, stderr, stdout;
 import std.string:    CaseSensitive, indexOf, representation, startsWith, strip, wrap;
@@ -35,6 +36,7 @@ import dxml.util:     encodeText;
 import das2.log:      errorf;
 import das2.time:     DasTime;
 import das2.units:    Units, UNIT_DIMENSIONLESS;
+import das2.util:     DasException;
 import das2c.value:   DAS_FILL_VALUE;
 
 private alias r = representation;
@@ -62,7 +64,7 @@ enum PropType {
  +  which is the authoritative upstream source.
  +/
 enum EncodingType {
-	UBYTE, UTF8, BE_INT, BE_UINT, BE_REAL, LE_INT, LE_UINT, LE_REAL
+	BYTE, UBYTE, UTF8, BE_INT, BE_UINT, BE_REAL, LE_INT, LE_UINT, LE_REAL
 };
 
 enum TagType {INVALID=0, Sx = 1, Hx = 2, Pd = 3, Cx = 4, Ex = 5, XX = 6 };
@@ -303,11 +305,13 @@ struct PktBuf(size_t buf_sz = 65536, StreamFmt SV = StreamFmt.v30 )
 		_iMsgWrite = _iMsgBeg;
 	}
 	
-	/*
-	this(){
-		clear();
+	
+	@property bool empty(){
+		return (_iMsgWrite == _iMsgBeg);
 	}
-	*/
+	
+
+	@property pktType(){ return _tt; }
 
 	void tag(TagType tt, ushort id=0){
 		_tt = tt; _pktId = id;
@@ -417,6 +421,8 @@ struct PktBuf(size_t buf_sz = 65536, StreamFmt SV = StreamFmt.v30 )
 		dest.flush();
 		clear();
 	}
+
+	
 }
 
 /* Stream Properties ****************************************************** */
@@ -658,6 +664,104 @@ int writeException(StreamFmt SF)(StreamExc et, string sMsg)
 		
 	errorf("%s", sMsg.strip());
 	return 13;
+}
+
+/* ************************************************************************ */
+/* Converting converage periods to a range of file names */
+
+alias BeginToPath = string function(DasTime);
+
+struct TimeCoverageFiles
+{
+private:
+	DasTime _dtBeg;
+	DasTime _dtEnd;
+	string  _sRoot;
+	string  _file;
+	bool    _empty;
+	int     _covSec;
+	BeginToPath _toPath;
+	
+public:
+	this(
+		string sRoot, BeginToPath timeToPath, int nCovSec, DasTime dtBeg, DasTime dtEnd
+	){
+		// Give 2 minutes overlap in output data
+		_dtBeg = dtBeg - 120.0;
+		_dtEnd = dtEnd + 120.0;
+		_sRoot = sRoot;
+		_toPath = timeToPath;
+		_covSec = nCovSec;
+		_empty = ! nextFile();
+	}
+
+	void popFront(){
+		if(!_empty){
+			_dtBeg = incTime();     // increment the start time
+			_empty = ! nextFile();  // Get the first file from here
+		}
+	}
+
+	@property bool empty(){ return _empty;}
+
+	@property string front(){ return _file; }
+
+private:
+	bool nextFile(){
+
+		while(_dtBeg < _dtEnd)
+		{
+			string sPath = _toPath(_dtBeg);
+
+			if(!exists(sPath) || !isFile(sPath)){
+				_dtBeg = incTime();
+				continue;  // Try again
+			}
+
+			_file = sPath;
+			return true;  // Aka I got one
+		}
+		return false; // Ran out of time range before getting a file
+	}
+
+	DasTime incTime(){
+		DasTime dtFloor;
+		if((_covSec % 86400) == 0)
+			dtFloor = DasTime(_dtBeg.year, _dtBeg.month, _dtBeg.mday);
+		else if((_covSec % 3600) == 0)
+			dtFloor = DasTime(_dtBeg.year, _dtBeg.month, _dtBeg.mday, _dtBeg.hour);
+		else if((_covSec % 60) == 0)
+			dtFloor = DasTime(
+				_dtBeg.year, _dtBeg.month, _dtBeg.mday, _dtBeg.hour, _dtBeg.minute
+			);
+		else
+			dtFloor = DasTime(
+				_dtBeg.year, _dtBeg.month, _dtBeg.mday, _dtBeg.hour, _dtBeg.minute,
+				_dtBeg.second
+			);
+
+		return dtFloor + _covSec;
+	}
+}
+
+TimeCoverageFiles timeCoverageFiles(
+	string sRoot, BeginToPath timeToPath, int nCovSec, DasTime dtBeg, DasTime dtEnd
+){
+	return TimeCoverageFiles(sRoot, timeToPath, nCovSec, dtBeg, dtEnd);
+}
+
+/++ Utility to flush to stdout after each range bytes is written 
+ + This is primarily used to make sure complete packets are sent to stdout
+ +/
+size_t flushBinWriter(RoRoB)(RoRoB rrBytes){
+	size_t uRanges;
+
+	foreach(rBytes; rrBytes){
+		uRanges += rBytes.length;
+		stdout.rawWrite(rBytes);
+		stdout.flush();
+	}
+	return uRanges;
 }
 
 /* Parsing & Streaming Binary Data **************************************** */

@@ -1,17 +1,15 @@
 module das2.stream;
 
-import std.format;
-import std.mmfile: MmFile;
-import std.file: exists, isFile;
+import std.algorithm: filter, find, endsWith, skipOver;
+import std.conv:      to;
+import std.file:      exists, isFile;
+import std.format:    format;
+import std.mmfile:    MmFile;
 import std.range;
-import std.algorithm: filter;
-import std.format : format;
-import std.system; // Endian, OS
-import std.conv : to;
-import std.typecons: Tuple;
-import std.algorithm: find, endsWith, skipOver;
-import std.system: Endian, endian;
-import std.string: toLower, indexOfAny;
+import std.string:    toLower, indexOfAny, strip;
+import std.system:    Endian, endian;
+import std.typecons:  Tuple;
+
 
 import dxml.parser; //parseXML, simpleXML, EntityType, Entity;
 import dxml.dom;    //
@@ -25,22 +23,6 @@ import das2c.tt2000: das_tt2K_to_utc;
 
 alias XmlStream = EntityRange!(simpleXML, const(char)[]);
 alias DomObj = DOMEntity!(XmlStream.Input);
-
-/* ************************************************************************* */
-class TypeException : Exception
-{
-package: // Only stuff in the das2 package can throw these
-	this(	string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
-		super(format("[%s,%s] %s", file, line, msg));
-	}
-}
-class StreamException : Exception
-{
-package: // Only stuff in the das2 package can throw these
-this(	string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
-		super(format("[%s,%s] %s", file, line, msg));
-	}
-}
 
 /* ************************************************************************* */
 
@@ -80,7 +62,7 @@ size_t mergeProperties(PktProp[string] props, DomObj dom)
 				case "DatumRange": type = PropType.DATUM_RNG; break;
 				case "realRange":  type = PropType.REAL_RNG;  break;
 				default:
-					throw new StreamException(format(
+					throw new DasException(format(
 						"Unknown property type '%s' at line %d", attr.value, elProp.pos.line
 					));
 				}
@@ -88,7 +70,7 @@ size_t mergeProperties(PktProp[string] props, DomObj dom)
 		}
 
 		if(name.length == 0)
-			throw new StreamException(format(
+			throw new DasException(format(
 				"Attribute name missing from property at line %d", elProp.pos.line
 			));
 
@@ -108,7 +90,7 @@ size_t mergeProperties(PktProp[string] props, DomObj dom)
 				if(subItem.name != "alt") continue;
 
 				if(type != PropType.STR)
-					throw new StreamException(format(
+					throw new DasException(format(
 						"Property '%s' at line %d contains an alternate "~
 						"langage setting, but is not a string property ",
 						name, subItem.pos.line
@@ -116,7 +98,7 @@ size_t mergeProperties(PktProp[string] props, DomObj dom)
 
 				auto attr = find!(a=> (a.name == "lang"))(subItem.attributes);
 				if(attr.empty)
-					throw new StreamException(format(
+					throw new DasException(format(
 						"'lang' attribute missing from <alt> element of "~
 						"property '%s' at line %d", name, subItem.pos.line
 					));
@@ -239,7 +221,7 @@ else{
 					decode.blks_per_item = to!int(attr.value[iPos..$]);
 					if(decode.blks_per_item > 65536){ 
 						// 64K / item sanity check
-						throw new StreamException("Individual values larger than 64 kB are not supported");
+						throw new DasException("Individual values larger than 64 kB are not supported");
 					}
 					sBufType = attr.value[0..iPos];
 				}
@@ -254,7 +236,7 @@ else{
 			case "int":    decode.bytes_per_blk = 4; decode.buf_type = BufferType.INT; break;
 			case "long":   decode.bytes_per_blk = 8; decode.buf_type = BufferType.LONG; break;
 			default:
-				throw new StreamException(format(
+				throw new DasException(format(
 					"Unknown default value encoding in element at line %d",
 					attr.value, nLineNo
 				));
@@ -329,7 +311,7 @@ public:
 				case "real":    _decode.sem_type = SemanticType.REAL;    break;
 				case "integer": _decode.sem_type = SemanticType.INTEGER; break;
 				default:
-					throw new StreamException(format("Unknown value type '%s' in "~
+					throw new DasException(format("Unknown value type '%s' in "~
 						"element '%s' at line %d'", attr.value, elArray.name, 
 						elArray.pos.line
 					));
@@ -358,7 +340,7 @@ public:
 		}
 
 		if(_decode.blks_per_item == VARIABLE_WIDTH && _decode.delim.length == 0){
-			throw new StreamException(format("Element <array> at %d has variable "~
+			throw new DasException(format("Element <array> at %d has variable "~
 				"width items, but no 'delim'inator has been set.", elArray.pos.line
 			));
 		}
@@ -384,7 +366,7 @@ public:
 			dest[0] = src[0];
 			break;
 		default:
-			throw new StreamException(format(
+			throw new DasException(format(
 				"Byte swapping size %s items not implemented", uLen
 			));
 		}
@@ -431,7 +413,7 @@ public:
 			bool bItemRead = false;
 
 			if(uDlmSz == 0)
-				throw new StreamException("No delimiter set for variable length items");
+				throw new DasException("No delimiter set for variable length items");
 
 
 			while((data.length >= uBlkSz) && (data[0..uDlmSz] != _decode.delim)){
@@ -462,7 +444,7 @@ public:
 		if(_items != VARIABLE_ITEMS){
 
 			for(size_t u = 0; u < _items; ++u)
-				if(! readItem(data) ) throw new StreamException(format(
+				if(! readItem(data) ) throw new DasException(format(
 					"Data packet too short for array '%s'", _name, ));	
 		}
 		else{
@@ -475,7 +457,7 @@ public:
 			// Assume that a variable number of items still needs at least one,
 			// might be a dubious assumption
 			if(uRead == 0)
-				throw new StreamException("Data packet too short for array"~_name);
+				throw new DasException("Data packet too short for array"~_name);
 		}
 		
 		return data;
@@ -507,7 +489,7 @@ public:
 	DasTime vtime(){
 		if(_units == UNIT_UTC){
 			if(_decode.buf_type != BufferType.TEXT)
-				throw new TypeException("units=\"UTC\" but raw data are not characters");
+				throw new DasException("units=\"UTC\" but raw data are not characters");
 			return DasTime(cast(const(char)[]) _rawdata);
 		}
 
@@ -536,7 +518,7 @@ public:
 			return _units.toTime(d);
 		}
 
-		throw new TypeException(format(
+		throw new DasException(format(
 			"Values in units=\"%s\" are not datetimes", _units ));
 	}
 
@@ -573,7 +555,7 @@ public:
 
 		case SemanticType.TIMES:
 			if(_units == UNIT_UTC)
-				throw new TypeException(format(
+				throw new DasException(format(
 					"ISO time strings not comparible to %s", typeid(T)
 				));
 					
@@ -590,7 +572,7 @@ public:
 				return 0;				
 			}
 		default:	
-			throw new TypeException(format(
+			throw new DasException(format(
 				"Text strings are not comparible to %s", typeid(T))
 			);
 		}
@@ -598,7 +580,7 @@ public:
 
 	int opCmp(T)(auto ref const T other) if( is(T:DasTime) ){
 		if(_decode.sem_type != SemanticType.TIME)
-			throw new TypeException("Non-time values can't be compared to a DasTime");
+			throw new DasException("Non-time values can't be compared to a DasTime");
 		DasTime dt = vtime();
 		return dt.opCmp(other);
 	}
@@ -618,7 +600,7 @@ struct PktDim {
 
 		auto attr = find!(a=> (a.name == "pdim"))(root.attributes);
 		if(attr.empty)
-			throw new StreamException(format(
+			throw new DasException(format(
 				"Physical dimension name missing in element '%s' at line %d",
 				root.name, root.pos.line
 			));
@@ -642,7 +624,7 @@ struct PktDim {
 			}
 
 			if(el.name == "xcoord" || el.name == "ycoord" ||el.name == "zcoord"){
-				throw new StreamException(format(
+				throw new DasException(format(
 					"Offset coordinate handling is yet implemented for '%s' at line %d",
 					el.name, el.pos.line
 				));
@@ -684,7 +666,7 @@ struct DasPkt {
 		_decode = cascadeDecode(decode, rXml.front.attributes, rXml.front.pos.line);
 
 		if(rXml.front.type == EntityType.elementEmpty)
-			throw new StreamException(format(
+			throw new DasException(format(
 				"Packet at line %d has no arrays", rXml.front.pos.line));
 
 		rXml.popFront();  // now at first content
@@ -692,17 +674,17 @@ struct DasPkt {
 
 		foreach(pdim; dom.children){
 			if(pdim.name == "yset" || pdim.name == "zset" || pdim.name == "wset")
-				throw new StreamException("yset, zset & wset reading not yet implemented");
+				throw new DasException("yset, zset & wset reading not yet implemented");
 
 			
 			if(pdim.name != "x" && pdim.name != "y" && pdim.name != "z")
-				throw new StreamException(format(
+				throw new DasException(format(
 					"Skipping custom content, '%s' is not yet implemented", pdim.name
 				));
 
 			auto attr = find!(a=> (a.name == "pdim"))(pdim.attributes);
 			if(attr.empty)
-				throw new StreamException(format("Required attribute 'pdim' missing from element '%s'", pdim.name));
+				throw new DasException(format("Required attribute 'pdim' missing from element '%s'", pdim.name));
 			
 			_readOrder ~= attr.front.value.dup;
 			_dims[_readOrder[$-1]] = PktDim(_decode, props, pdim);
@@ -751,7 +733,7 @@ package:
 	int getPktId(XmlStream rXml){
 		auto attr = find!(a=> (a.name == "id"))(rXml.front.attributes);
 		if(attr.empty)
-			throw new StreamException(format(
+			throw new DasException(format(
 				"[%s:%d] 'id' attribute missing from <%s> element. ",
 					_source, rXml.front.pos.line, rXml.front.name
 			));
@@ -777,7 +759,7 @@ public:
 		_rXml = parseXML!(simpleXML)(_data);
 
 		if(_rXml.front.name != "stream")
-			throw new StreamException(format("First element is named %s, "~
+			throw new DasException(format("First element is named %s, "~
 				"expected 'stream'", _rXml.front.name
 			));
 		
@@ -836,14 +818,14 @@ public:
 			case "d":
 				id = getPktId(_rXml);
 				if(id !in _pkts)
-					throw new StreamException(format(
+					throw new DasException(format(
 						"[%s:%d] Data packet id='%d' received before "~
 						"header packet", _source, _rXml.front.pos.line, id
 					));
 
 				_rXml.popFront();
 				if(_rXml.front.type != EntityType.text)
-					throw new StreamException(format(
+					throw new DasException(format(
 						"[%s:%d] Data packet id='%d' is empty", _source, 
 						_rXml.front.pos.line, id
 					));
@@ -858,7 +840,7 @@ public:
 				break NEXTPKT;    // we have data now
 
 			default:
-				throw new StreamException(format(
+				throw new DasException(format(
 					"[%s:%d] Unexpected header element '%s'", _source, 
 					_rXml.front.pos.line, _rXml.front.name
 				));
@@ -901,4 +883,193 @@ unittest{
 	}
 
 	writefln("INFO: das2.stream unittest passed");
+}
+
+
+/* ************************************************************************ */
+/* 2023 Iteration!!! 
+ *
+ * NOTE: This version came out after the version above.  They do NOT read
+ *       the same XML schemas.  The code above is outdated.  Once the 
+ *       Voyager time index readers are updated the ideas above and the 
+ *       ideas below can be merged.  -cwp 2023-02-06
+ */
+
+/* Raw Reading of das3 tagged items from 1-N input file names */
+
+import das2.producer:  TagType;
+
+/++ Raw unparsed packets +/
+struct RawPkt{
+	TagType tag;
+	ushort  id;
+	const(ubyte)[] data;
+}
+
+/++ Basic das3 packet reading by shortening the input range.
+ + 
+ + Params:
+ +   pSrc = Anything that has slice semantics, including a memory mapped file struct 
+ +          The input range is shortened to the remaining un-read bytes
+ + 
+ + Returns:
+ +   A tuple containing the packet tag, packet id and data pointer
+ +
+ + Raises:
+ +   DasException if there is a problem parsing the next packet
+ +/
+RawPkt readTaggedPkts(PTR)(ref PTR pSrc)
+{
+	RawPkt tRet;	
+
+	tRet.tag = TagType.INVALID;
+	tRet.id  = 0;
+
+	// The normal return
+	// The correct return
+	if(pSrc.length == 0)
+		return tRet;
+
+	// Get four pipes
+	ulong[4] aPipes = 0;
+	long nSet = 0;
+	ulong uPos = 0;
+	while((nSet < 4)&&(uPos < pSrc.length)){
+		if(pSrc[uPos] == cast(byte)'|'){
+			aPipes[nSet] = uPos;
+		}
+		uPos += 1;
+		nSet += 1;
+	}
+	if(nSet < 4)  // Couldn't get 4 pipes before hitting the end of the file
+		return tRet;
+	// Type tag is not 2 bytes long, or data length is not more then 10 chars long 
+	// or less then 1 char long
+	if(((aPipes[1] - aPipes[0]) != 3)||((aPipes[3] - aPipes[1]) < 2)||
+		((aPipes[3] - aPipes[2]) > 11)
+	){
+		throw new DasException("Maleformed packet tag");
+	}
+	// See if we recognize the tag
+	string sTag = to!string( pSrc[ aPipes[0]+1 .. aPipes[1]] );
+	switch(sTag){
+	case "Sx": tRet.tag = TagType.Sx; break;
+	case "Hx": tRet.tag = TagType.Hx; break;
+	case "Pd": tRet.tag = TagType.Pd; break;
+	case "Cx": tRet.tag = TagType.Cx; break;
+	case "Ex": tRet.tag = TagType.Ex; break;
+	case "XX": tRet.tag = TagType.XX; break;
+	default:
+		return tRet;
+	}
+	// Okay, now get the packet ID
+	if((aPipes[2] - aPipes[1]) > 1){
+		string _buf = to!string(pSrc[ aPipes[1]+1 .. aPipes[2] ]);
+		string sId = _buf.strip();
+		try{
+			tRet.id = to!ushort(sId);
+		}
+		catch(ConvException ex){
+			throw new DasException(ex.toString());
+		}
+	}
+	// Get the length
+	ulong uLen;
+	try{
+		string _buf = to!string(pSrc[ aPipes[2]+1 .. aPipes[3]]);
+		uLen = to!ulong( to!int(_buf.strip() ));
+	}
+	catch(ConvException ex){
+		throw new DasException("Invalid packet length");
+	}
+	if(uLen > (pSrc.length - (aPipes[3]+1))){
+		throw new DasException(
+			format!"Next packet is %d bytes long, but only %d reamian to read"(
+			uLen, pSrc.length - (aPipes[3]+1)
+		));
+	}
+
+	ulong uBeg = aPipes[3]+1;
+	ulong uEnd = aPipes[3] + 1 + uLen;
+	tRet.data = pSrc[uBeg .. uEnd];
+
+	// Shorten the range...
+	pSrc = pSrc[uEnd .. $];
+
+	return tRet;
+}
+
+// Given a range of file names that should be das3 stream files, produce a range simple
+// packet structures
+struct RawPktRdr(R)
+	if(isInputRange!R && is(ElementType!R == string))
+{
+
+public:
+	R _names;
+	MmFile _file;
+	bool _empty;
+	const(ubyte)[] _unread;
+	RawPkt _rawPkt;
+
+
+	this(R names){
+		_names = names;
+		if(_names.empty() ){
+			_empty = true;
+		}
+		else{
+			// Setup the conditions for the first call of nextPkt
+			_empty = false;
+			_file = new MmFile(_names.front);
+			_unread = cast(const(ubyte)[]) _file[];
+			_empty = ! nextPkt();     // <-- sets _rawPkt if it can
+		}
+	}
+
+	@property RawPkt front(){ return _rawPkt;}
+	@property bool empty(){ return _empty; }
+
+	void popFront(){
+		_empty = !nextPkt();
+	}
+
+private:
+	// Return true if there is a next packet
+	bool nextPkt(){
+		if(_empty) return false;
+
+		PKT_LOOP: while(true){
+
+			// If this file is exhausted, try to get a next one
+			FILE_LOOP: while((_unread.length == 0)&&(!_names.empty)){
+				_file = null;
+				_names.popFront();
+				if(_names.empty)
+					return false;  // no more packets
+
+				_file = new MmFile(_names.front, MmFile.Mode.read, 0, null);
+				_unread = cast(const(ubyte)[]) _file[];
+
+				// This *could* be an empty length file, be read to try again
+			}
+
+			// Read the next packet see if we care about it
+			_rawPkt = readTaggedPkts(_unread); // Shortens the range
+
+			if(_rawPkt.tag == TagType.INVALID){
+				_unread = [];          // Set the file done and...
+				continue PKT_LOOP;     // try again
+			}
+			else
+				break PKT_LOOP;        // We set a good rawPkt
+		}
+
+		return true;
+	}
+}
+
+/++ Turn a range of das3 filenames into a range of das3 packets +/
+RawPktRdr!R rawPktRdr(R)(R names){
+	return RawPktRdr!R(names);
 }
