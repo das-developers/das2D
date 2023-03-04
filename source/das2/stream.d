@@ -869,7 +869,7 @@ unittest{
 	auto beg = DasTime("1979-350");
 	auto end = DasTime("1980-010");
 
-	auto d2s_xml_file = "./test/vg1_mag_hg_48s_index.xml";
+	auto d2s_xml_file = "./testdata/vg1_mag_hg_48s_index.xml";
 
 	auto stream = new DasStream(d2s_xml_file);
 

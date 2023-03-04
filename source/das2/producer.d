@@ -676,7 +676,6 @@ struct TimeCoverageFiles
 private:
 	DasTime _dtBeg;
 	DasTime _dtEnd;
-	string  _sRoot;
 	string  _file;
 	bool    _empty;
 	int     _covSec;
@@ -684,12 +683,11 @@ private:
 	
 public:
 	this(
-		string sRoot, BeginToPath timeToPath, int nCovSec, DasTime dtBeg, DasTime dtEnd
+		BeginToPath timeToPath, int nCovSec, DasTime dtBeg, DasTime dtEnd
 	){
 		// Give 2 minutes overlap in output data
 		_dtBeg = dtBeg - 120.0;
 		_dtEnd = dtEnd + 120.0;
-		_sRoot = sRoot;
 		_toPath = timeToPath;
 		_covSec = nCovSec;
 		_empty = ! nextFile();
@@ -745,9 +743,9 @@ private:
 }
 
 TimeCoverageFiles timeCoverageFiles(
-	string sRoot, BeginToPath timeToPath, int nCovSec, DasTime dtBeg, DasTime dtEnd
+	BeginToPath timeToPath, int nCovSec, DasTime dtBeg, DasTime dtEnd
 ){
-	return TimeCoverageFiles(sRoot, timeToPath, nCovSec, dtBeg, dtEnd);
+	return TimeCoverageFiles(timeToPath, nCovSec, dtBeg, dtEnd);
 }
 
 /++ Utility to flush to stdout after each range bytes is written 

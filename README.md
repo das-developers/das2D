@@ -1,5 +1,5 @@
 # das2D 
-Initial [D language](https://dlang.org/) das2 module
+Initial [D language](https://dlang.org/) das2/3 module
 
 This is a wrapper around the das2C library with adapters that make much of
 the interface more D-like.  This module is *not ready for prime time*, it is
@@ -28,16 +28,22 @@ import das2c;
 
 ## Building
 
-This is a source library, so technically there is nothing to build, though 
-running the included unit tests is a good idea.  To do so you'll have to
-provide the location to your libdas2.3.so file using the `LD_LIBRARY_PATH`
-environment variable.  For example, assume you've built das2C in your home
-directory with `N_ARCH` set to `ubuntu20`, then, to build this module's
-unit tests run:
+The main project is a source library, but some utilities are included.
+To build  these you'll have to provide the location to your libdas2.3.so file
+using the `LD_LIBRARY_PATH` environment variable.  For example, assume you've
+built das2C in your home directory with `N_ARCH` set to `ubuntu20`, then, to
+build this module's unit tests run:
 
 ```bash
 env LD_LIBRARY_PATH=$HOME/git/das2C/build.ubuntu20 dub test
 ```
+
+And to build the excutables issue:
+```bash
+env LD_LIBRARY_PATH=$HOME/git/das2C/build.ubuntu20 dub build :tsread -c das2
+env LD_LIBRARY_PATH=$HOME/git/das2C/build.ubuntu20 dub build :tsread -c das3
+```
+This will create both a das2 and das3 version of the included time-series reader utility program.
 
 To build the documentation run the excellent 
 [adrdox](https://github.com/adamdruppe/adrdox) tool on the main project area:
@@ -47,6 +53,19 @@ cd das2D
 doc2 ./
 ```
 The program 'doc2' is supplied by `adrdox`.
+
+### If your das2C links to SPICE
+
+The build steps are are a little different if your version of das2C was linked against the NAIF cspice libraries.  Since cspice.a is not normally distributed as
+a shared object we'll need to do static linking, as follows:
+
+```bash
+export DAS2_LIB=$HOME/git/das2C/build.ubuntu23
+export CSPICE_LIB=/usr/local/naif/cspice/lib/cspice.a
+dub test -c spice
+dub build :tsread -c das2 --override-config=libdas/spice
+dub build :tsread -c das3 --override-config=libdas/spice
+```
 
 ## Using in D Scripts
 
