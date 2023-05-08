@@ -3,7 +3,7 @@
 	"dependencies": { "dxml": "*" },
 	"description": "D extensions for the das2C library",
 	"license": "MIT",
-	"name": "das2d",
+	"name": "das2",
 	"homepage": "https://github.com/das-developers/das2D",
 	"lflags":["-L$LD_LIBRARY_PATH"],
 	"lflags-osx":["-L$LD_LIBRARY_PATH","-L/usr/local/opt/openssl/lib"],
