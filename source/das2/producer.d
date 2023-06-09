@@ -675,6 +675,13 @@ int writeException(StreamFmt SF)(StreamExc et, string sMsg)
 	return 13;
 }
 
+int writeException(StreamFmt SF)(
+	StreamExc et, string sFile, ulong uLine, string sMsg
+){
+	string _sMsg = format!("%s,%d: %s")(sFile, uLine, sMsg);
+	return writeException!SF(et, _sMsg);
+}
+
 /* ************************************************************************ */
 /* Converting converage periods to a range of file names */
 
