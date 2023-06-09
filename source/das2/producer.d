@@ -259,7 +259,7 @@ enum StreamExc{ Query, Server, NoData };
 string toString(StreamFmt SV)(StreamExc et){
 	static if(SV == StreamFmt.v30){
 		switch(et){
-		case StreamExc.Query: return "QueryError";
+		case StreamExc.Query:  return "QueryError";
 		case StreamExc.Server: return "ServerError";
 		case StreamExc.NoData: return "NoMatchingData";
 		default: break;
@@ -267,7 +267,7 @@ string toString(StreamFmt SV)(StreamExc et){
 	}
 	else{
 	switch(et){
-		case StreamExc.Query: return "IllegalArgument";
+		case StreamExc.Query:  return "IllegalArgument";
 		case StreamExc.Server: return "ServerError";
 		case StreamExc.NoData: return "NoDataInInterval";
 		default: break;
@@ -276,6 +276,7 @@ string toString(StreamFmt SV)(StreamExc et){
 	return "INVALID";
 }
 
+enum size_t USE_HEAP = 0;
 
 /+ Structure to hold a stack buffer and and track write points
  +
@@ -283,13 +284,22 @@ string toString(StreamFmt SV)(StreamExc et){
  + for each instance of this structure.
  + 
  + Params:
- +    buf_sz = The max number of bytes required by a single packet, don't 
+ +    buf_sz = If zero, the heap is used for unlimited packet sizes.
+ +             If not-zero, stack memory is used and this represents
+ +             The max number of bytes required by a single packet, don't 
  +             make this too big or you'll get a stack overflow.  An 
  +             additional 48 bytes are reserved for the packet tag.
  +/
-struct PktBuf(size_t buf_sz = 65536, StreamFmt SV = StreamFmt.v30 )
+struct PktBuf(size_t buf_sz = 0, StreamFmt SV = StreamFmt.v30 )
 {
-	ubyte[buf_sz + 48] _buf;        
+
+static if (buf_sz > 0){
+	ubyte[buf_sz + 48] _buf;
+}
+else{
+	ubyte[] _buf;
+}
+
 	/* Leave room for a tag with 2 tag bytes, 4 pipe bytes, 10 len bytes
 	   and 32 tag bytes, for a total of 48 bytes. */
 	immutable(size_t) _iMsgBeg = 48;
@@ -422,7 +432,6 @@ struct PktBuf(size_t buf_sz = 65536, StreamFmt SV = StreamFmt.v30 )
 		clear();
 	}
 
-	
 }
 
 /* Stream Properties ****************************************************** */
