@@ -30,6 +30,7 @@ import std.string:    CaseSensitive, indexOf, representation, startsWith, strip,
 import std.system:    Endian;
 import std.traits:    isArray, isSomeString;
 import std.typecons:  No;
+import std.utf:       toUTF8;
 
 import dxml.util:     encodeText;
 
@@ -293,11 +294,11 @@ enum size_t USE_HEAP = 0;
 struct PktBuf(size_t buf_sz = 0, StreamFmt SV = StreamFmt.v30 )
 {
 
-static if (buf_sz > 0){
-	ubyte[buf_sz + 48] _buf;
+static if(buf_sz == USE_HEAP){
+	ubyte[] _buf;
 }
 else{
-	ubyte[] _buf;
+	ubyte[buf_sz + 48] _buf;
 }
 
 	/* Leave room for a tag with 2 tag bytes, 4 pipe bytes, 10 len bytes
@@ -312,9 +313,8 @@ else{
 	void clear(){
 		_pktId = 0;
 		_nTagLen = 0;
-		_iMsgWrite = _iMsgBeg;
+		_iMsgWrite = _iMsgBeg; // does not deallocate memory
 	}
-	
 	
 	@property bool empty(){
 		return (_iMsgWrite == _iMsgBeg);
@@ -364,6 +364,13 @@ else{
 
 				// Skip bit manipulation for single byte types
 				static if( (ElementType!(T[I])).sizeof == 1){
+
+					static if (buf_sz == USE_HEAP){  // Grow if needed
+						if(_buf.length < _iMsgWrite + arg.length){
+							_buf.length = _iMsgWrite + arg.length;
+						}
+					}
+					
 					for(int i = 0; i < arg.length; ++i){
 						_buf[_iMsgWrite] = cast(ubyte) arg[i];
 						++_iMsgWrite;
@@ -372,6 +379,13 @@ else{
 
 				// For multi-byte types do the byte shuffle dance
 				else{
+					static if (buf_sz == USE_HEAP){  // Grow if needed
+						ulong elSz = (ElementType!(T[I])).sizeof;
+						if(_buf.length < (_iMsgWrite + arg.length*elSz)){
+							_buf.length = (_iMsgWrite + arg.length*elSz);
+						}
+					}
+
 					foreach(i, item; arg){ 
 						_buf[].write!(ElementType!(T[I]), endian)(arg[i], &_iMsgWrite);
 					}
@@ -379,6 +393,13 @@ else{
 			}
 			else{
 				//output.write!(T[I], endian)(arg,0);
+
+				static if (buf_sz == USE_HEAP){  // Grow if needed
+					if(_buf.length < (_iMsgWrite + T[I].sizeof)){
+						_buf.length = (_iMsgWrite + T[I].sizeof);
+					}
+				}
+
 				_buf[].write!(T[I], endian)(arg, &_iMsgWrite);
 			}
 		}
@@ -388,9 +409,19 @@ else{
 	/+ Write formatted string data to the buffer.  Encoding should be utf-8 +/
 	void writef(alias fmt, Args...)(Args args)
 	if (isSomeString!(typeof(fmt))){
-		char[] space = cast(char[]) _buf[_iMsgWrite..$];
-		char[] used  = sformat!fmt(space, args);
 
+		static if (buf_sz == USE_HEAP){
+			// write to temporary area when using the heap
+			immutable(ubyte)[] used = format!fmt(args).toUTF8().representation;
+			if(_buf.length < (_iMsgWrite + used.length)){
+				_buf.length = (_iMsgWrite + used.length);
+			}
+			_buf[_iMsgWrite .. _iMsgWrite + used.length] = used[0..$];
+		}
+		else{
+			char[] space = cast(char[]) _buf[_iMsgWrite..$];
+			char[] used  = sformat!fmt(space, args);
+		}
 		_iMsgWrite += used.length;
 	}
 	
@@ -416,6 +447,9 @@ else{
 			}
 
 			_nTagLen = tag.length;
+			static if(buf_sz == USE_HEAP){
+				if(_buf.length < _iMsgBeg) _buf.length = _iMsgBeg;
+			}
 			_buf[_iMsgBeg - _nTagLen .. _iMsgBeg] = cast(ubyte[])tag;
 
 		}
