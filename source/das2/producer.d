@@ -26,7 +26,8 @@ import std.getopt:    getopt, config, GetoptResult, Option;
 import std.range:     ElementType, isInputRange;
 import std.regex:     regex, splitter;
 import std.stdio:     File, stderr, stdout;
-import std.string:    CaseSensitive, indexOf, representation, startsWith, strip, wrap;
+import std.string:    CaseSensitive, indexOf, replace, representation, startsWith, 
+                      split, strip, toUpper, wrap;
 import std.system:    Endian;
 import std.traits:    isArray, isSomeString;
 import std.typecons:  No;
@@ -328,13 +329,30 @@ private S _breakNrap(S)(
 	S sText, size_t cols = 80, S firstindent = null, S indent = null, size_t tabsize = 2
 ){
 
+	// Swap in pattern for tabs
+	string sRep = sText.replace("\f","{|&");
+
 	auto reg = regex(`\v`);
 
-	string s = sText.splitter(reg).
+	string s = sRep.splitter(reg).
 		map!(s => s.wrap(cols, firstindent, indent, tabsize)).
 		join();
 
-	return s;
+	// Final check, if a line contains only one work and the toUpper = the original
+	// do not indent it.
+	string[] aLines;
+	foreach(sLine; s.split('\n')){
+		string sTmp = sLine.strip();
+		if(sTmp.toUpper() == sTmp)
+			aLines ~= [sTmp];
+		else
+			aLines ~= [sLine];
+	}
+
+	string sOut = aLines.join("\n");
+
+	return sOut.replace("{|&","   ");   // Take out the tab pattern
+
 }
 
 /* Packet Buffering and Tagging ******************************************* */
