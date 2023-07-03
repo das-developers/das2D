@@ -189,6 +189,91 @@ bool getRdrOpts(StreamFmt SF, T...)(
 	return true;
 }
 
+/++ A wrapper for getopt that converts help into a short man page.
+ +
+ + This function creates text intended for display inside terminal windows and 
+ + wraps long lines to the width of the window.  Inside sections the whitespace
+ + characters \n \r \t and space are all replaced with a single space character.
+ + Two special whitespace characters that don't normally appear in code text
+ + may be used to provide minimal formatting:
+ +
+ +   \v - Add a newline to the output regardless of normal wrapping
+ +   \f - Add an indent to the output regardless of normal wrapping
+ +
+ + In addition, any line consisting of only upper case characters is treated
+ + as a section header and is not indented.
+ +
+ + In general help output resembles unix man pages.
+ +
+ + Params:
+ +   aArgs = The the command line arguments as supplied to main().  These are
+ +      passed down to getopt().
+ +
+ +   name = The name of the program, need not match aArgs[0]
+ +
+ +   synopsis = A 1-line summary of the purpose of the program
+ +
+ +   usage = A 1-line summary of the command line arguments for the program
+ +
+ +   desc = Descriptive text that appears before the option list.  May use the
+ +      \v and \f format specifiers.
+ +
+ +   footer = Descriptive text that appears after the option list.  May use the
+ +      \v and \f format specifiers.  Topic headings are traditionally used 
+ +      here as well.
+ +
+ +   opts = All following arguments define command line options as described
+ +      in getopt.
+ +/
+bool getCmdOpts(T...)(
+	ref string[] aArgs, string name, string synopsis, string usage, string desc,
+	string footer, T opts
+){
+	
+	int[] aTermSz = termSize();
+	int cols = aTermSz[0];
+
+	string sind = "   ";    // Single indent
+	string dind = "      "; // Double indent
+
+	GetoptResult rslt;
+
+	// For narrow terminals, back off the indent.
+	if(cols < 60){ sind = "  "; dind = "    ";}
+	if(cols < 40){ sind = " ";  dind = "  ";}
+
+	// TODO: Add paragraph split on vertical tab '\v'
+	string header = "NAME\n" ~
+		wrap(name ~ " - " ~ synopsis, cols, sind, dind) ~ "\n" ~
+		"USAGE\n" ~
+		wrap(usage, cols, sind, sind) ~ "\n" ~
+		"DESCRIPTION\n" ~
+		_breakNrap(desc, cols, sind, sind) ~ "\n" ~
+		"OPTIONS\n";  // Deal with commands without options later
+
+	if(footer.length > 0) footer = _breakNrap(footer, cols, sind, dind);
+
+	try{
+		rslt = getopt(aArgs, config.passThrough, config.caseSensitive, opts);
+	}
+	catch(Exception ex){
+		errorf("Error parsing command line, %s\nUse -h for more help", ex.msg);
+		return false;
+	}
+
+	if(rslt.helpWanted){
+		stdout.write(header);
+		auto output = appender!(string)();
+		_formatOptions(output, rslt.options, cols, "   ", "            ");
+		stdout.write(output.data);
+		if(footer.length > 0) stdout.write(footer);
+		exit(0);
+	}
+
+	return true;
+}
+
+
 /* Format getopt options for printing in the style of man page output
  *
  * Params: 
