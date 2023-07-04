@@ -27,7 +27,7 @@ import std.range:     ElementType, isInputRange;
 import std.regex:     regex, splitter;
 import std.stdio:     File, stderr, stdout;
 import std.string:    CaseSensitive, indexOf, replace, representation, startsWith, 
-                      split, strip, toUpper, wrap;
+                      split, strip, toLower, toUpper, wrap;
 import std.system:    Endian;
 import std.traits:    isArray, isSomeString;
 import std.typecons:  No;
@@ -598,7 +598,36 @@ struct Property{
 		return value;
 	}
 
-	// a universal constructor, probably unneeded
+	/++ a string based constructer, understands das-telem type codes +/
+	this(string n, string t, string v, string u){
+		switch(t.toLower()){
+			case "s":       type = PropType.STRING; break;
+			case "str":     type = PropType.STRING; break;
+			case "string":  type = PropType.STRING; break;
+			case "b":       type = PropType.BOOL; break;
+			case "bool":    type = PropType.BOOL; break;
+			case "dt":      type = PropType.DATETIME; break;
+			case "datetime":type = PropType.DATETIME; break;
+			case "dtr":     type = PropType.DATETIME_RNG; break;
+			case "datetime_rng": type = PropType.DATETIME_RNG; break;
+			case "i":       type = PropType.INT; break;
+			case "int":     type = PropType.INT; break;
+			case "integer": type = PropType.INT; break;
+			case "ir":      type = PropType.INT_RNG; break;
+			case "int_rng": type = PropType.INT_RNG; break;
+			case "r":       type = PropType.REAL; break;
+			case "real":    type = PropType.REAL; break;
+			case "rr":      type = PropType.REAL_RNG; break;
+			case "real_rng":type = PropType.REAL; break;
+			default:
+				enforce(false, format!"Unknown proprety type '%s'"(t));
+		}
+
+		name = n; 
+		units = Units(u); 
+		value = v; 
+	}
+
 	this(string n, PropType t, string v, Units u = UNIT_DIMENSIONLESS){ 
 		name = n; type = t; units = u; value = v; 
 	}
