@@ -161,7 +161,7 @@ bool getRdrOpts(StreamFmt SF, T...)(
 	if(footer.length > 0) footer = "NOTES\n" ~ wrap(footer, cols, sind, dind);
 
 	try{
-		rslt = getopt(aArgs, config.passThrough, opts);
+		rslt = getopt(aArgs, config.passThrough, config.caseSensitive, opts);
 	}
 	catch(ConvException ex){
 		writeStreamHeader!SF();
