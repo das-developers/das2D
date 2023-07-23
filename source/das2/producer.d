@@ -16,13 +16,14 @@ module das2.producer;
 import core.stdc.stdlib: exit;
 
 import std.algorithm: canFind, copy, map;
-import std.array:     appender, join;
-import std.bitmanip:  write;
+import std.array:     appender, join, Appender;
+import std.bitmanip:  read, write;
 import std.conv:      ConvException, to;
 import std.exception: enforce;
 import std.file:      exists, isFile;
 import std.format:    format, sformat;
 import std.getopt:    getopt, config, GetoptResult, Option;
+import std.json:      JSONValue;
 import std.range:     ElementType, isInputRange;
 import std.regex:     regex, splitter;
 import std.stdio:     File, stderr, stdout;
@@ -42,6 +43,7 @@ import das2.util:     DasException;
 import das2c.value:   DAS_FILL_VALUE;
 
 private alias r = representation;
+private alias JsonValue = JSONValue;
 
 enum FLOAT_FILL = to!float(DAS_FILL_VALUE);
 
@@ -61,6 +63,33 @@ enum PropType {
  	STRING, BOOL, DATETIME, DATETIME_RNG, INT, INT_RNG, REAL, REAL_RNG
 };
 
+PropType propType(string sPropType)
+{
+	switch(sPropType.toLower()){
+	case "s":        return PropType.STRING;
+	case "str":      return PropType.STRING;
+	case "string":   return PropType.STRING;
+	case "b":        return PropType.BOOL;
+	case "bool":     return PropType.BOOL;
+	case "dt":       return PropType.DATETIME;
+	case "datetime": return PropType.DATETIME;
+	case "dtr":      return PropType.DATETIME_RNG;
+	case "datetime_rng": return PropType.DATETIME_RNG;
+	case "i":        return PropType.INT;
+	case "int":      return PropType.INT;
+	case "integer":  return PropType.INT;
+	case "ir":       return PropType.INT_RNG;
+	case "int_rng":  return PropType.INT_RNG;
+	case "r":        return PropType.REAL;
+	case "real":     return PropType.REAL;
+	case "rr":       return PropType.REAL_RNG;
+	case "real_rng": return PropType.REAL;
+	default:
+		enforce(false, format!"Unknown property type '%s'"(sPropType));
+	}
+	assert(0);
+}
+
 /++ Flags corresponding to the output types given in:
  +     das-basic-stream-v3.0.xsd  
  +  which is the authoritative upstream source.
@@ -68,6 +97,111 @@ enum PropType {
 enum EncodingType {
 	BYTE, UBYTE, UTF8, BE_INT, BE_UINT, BE_REAL, LE_INT, LE_UINT, LE_REAL
 };
+
+/++ Create das buffer encoding types given a string.
+ +
+ + Params:
+ +   s = One of "byte", "ubyte", "utf8", "BEint", "BEuint", "BEreal",
+ +       "LEint", "LEuint",  or "LEreal"
+ +/
+EncodingType encodingType(string sEncoding){
+	switch(sEncoding){
+		case "byte":   return EncodingType.BYTE;
+		case "ubyte":  return EncodingType.UBYTE;
+		case "utf8":   return EncodingType.UTF8;
+		case "BEint":  return EncodingType.BE_INT;
+		case "BEuint": return EncodingType.BE_UINT;
+		case "BEreal": return EncodingType.BE_REAL;
+		case "LEint":  return EncodingType.LE_INT;
+		case "LEuint": return EncodingType.LE_UINT;
+		case "LEreal": return EncodingType.LE_REAL;
+		default:
+			enforce(false, format!"Unknown encoding type '%s'"(sEncoding));
+	}
+	assert(0);
+}
+
+/++ Convert to a D type based on a das buffer encoding type 
+ +
+ + Params:
+ +    IT = The input type, this has no default
+ +    OT = The output type, defaults to long.
+ +    pBuf = The buffer from which to read the 
+ +/
+OT dval(OT=long)(ubyte[] pBuf, EncodingType enc)
+{
+	enforce(pBuf.length > 0, "Empty buffer");
+
+	TYPE_SWITCH: switch(enc){
+		case EncodingType.UBYTE: 
+		return to!OT(pBuf[0]);
+
+		case EncodingType.BYTE:
+		return to!OT(cast(byte)pBuf[0]);
+
+		case EncodingType.UTF8:
+		static if (is(OT == string)){
+			return cast(string)pBuf;     // Assume it was UTF-8 encoded to begin with
+		}
+		else{
+			return to!OT( cast(string)pBuf);
+		}
+
+		case EncodingType.LE_REAL:
+		switch(pBuf.length){
+			case 4u:  return to!OT( pBuf.read!(float,  LE) );
+			case 8u:  return to!OT( pBuf.read!(double, LE) );
+			default:  break TYPE_SWITCH; 
+		}
+
+		case EncodingType.BE_REAL:
+		switch(pBuf.length){
+			case 4u:  return to!OT( pBuf.read!(float,  BE) );
+			case 8u:  return to!OT( pBuf.read!(double, BE) );
+			default:  break TYPE_SWITCH;
+		}
+		
+		case EncodingType.LE_UINT:
+		switch(pBuf.length){
+			case 2u:  return to!OT( pBuf.read!(ushort, LE) );
+			case 4u:  return to!OT( pBuf.read!(uint,   LE) );
+			case 8u:  return to!OT( pBuf.read!(ulong,  LE) );
+			default:  break TYPE_SWITCH;
+		}
+
+		case EncodingType.BE_UINT:
+		switch(pBuf.length){
+			case 2u:  return to!OT( pBuf.read!(ushort, BE) );
+			case 4u:  return to!OT( pBuf.read!(uint,   BE) );
+			case 8u:  return to!OT( pBuf.read!(ulong,  BE) );
+			default:  break TYPE_SWITCH;
+		}
+
+		case EncodingType.LE_INT:
+		switch(pBuf.length){
+			case 2u:  return to!OT( pBuf.read!(short, LE) );
+			case 4u:  return to!OT( pBuf.read!(int,   LE) );
+			case 8u:  return to!OT( pBuf.read!(long,  LE) );
+			default:  break TYPE_SWITCH;
+		}
+
+		case EncodingType.BE_INT:
+		switch(pBuf.length){
+			case 2u:  return to!OT( pBuf.read!(short, BE) );
+			case 4u:  return to!OT( pBuf.read!(int,   BE) );
+			case 8u:  return to!OT( pBuf.read!(long,  BE) );
+			default:  break TYPE_SWITCH;
+		}
+
+		default:
+		enforce(false, format!"Unknown buffer encoding type %s"(enc));
+	}
+
+	enforce(0, format!(
+		"Invalid buffer length %d for encoding type %s")(pBuf.length, enc)
+	);
+	return OT.init; // shutup compiler
+}
 
 enum TagType {INVALID=0, Sx = 1, Hx = 2, Pd = 3, Cx = 4, Ex = 5, XX = 6 };
 
@@ -380,6 +514,18 @@ string toString(StreamFmt SV)(StreamExc et){
 	return "INVALID";
 }
 
+/++ An exception that can be translated into in-band error output for das data
+ + producers.
+ +/ 
+class ProdException : Exception {
+	StreamExc category;
+	// One reason D rocks.  __file__ and __line__ below refer to the *call* site, 
+	// not this source file.
+	this(StreamExc, string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
+		super(format!"[%s:%s] %s"(file, line, msg));
+	}
+}
+
 enum size_t USE_HEAP = 0;
 
 /+ Structure to hold a stack buffer and and track write points
@@ -600,29 +746,7 @@ struct Property{
 
 	/++ a string based constructer, understands das-telem type codes +/
 	this(string n, string t, string v, string u){
-		switch(t.toLower()){
-			case "s":       type = PropType.STRING; break;
-			case "str":     type = PropType.STRING; break;
-			case "string":  type = PropType.STRING; break;
-			case "b":       type = PropType.BOOL; break;
-			case "bool":    type = PropType.BOOL; break;
-			case "dt":      type = PropType.DATETIME; break;
-			case "datetime":type = PropType.DATETIME; break;
-			case "dtr":     type = PropType.DATETIME_RNG; break;
-			case "datetime_rng": type = PropType.DATETIME_RNG; break;
-			case "i":       type = PropType.INT; break;
-			case "int":     type = PropType.INT; break;
-			case "integer": type = PropType.INT; break;
-			case "ir":      type = PropType.INT_RNG; break;
-			case "int_rng": type = PropType.INT_RNG; break;
-			case "r":       type = PropType.REAL; break;
-			case "real":    type = PropType.REAL; break;
-			case "rr":      type = PropType.REAL_RNG; break;
-			case "real_rng":type = PropType.REAL; break;
-			default:
-				enforce(false, format!"Unknown proprety type '%s'"(t));
-		}
-
+		type = propType(t);
 		name = n; 
 		units = Units(u); 
 		value = v; 
@@ -673,6 +797,18 @@ struct Property{
 	this(string n, DasTime a, DasTime b, Units u = UNIT_DIMENSIONLESS){
 		type = PropType.DATETIME_RNG; name = n; units = u;
 		value = format!("%s to %s")(a.isoShort(), b.isoShort());
+	}
+
+	/++ Create a property from a JSON Object 
+    + Params:
+    +  jv = A JSON Object with at least the keys "name" & "value"  The 
+    +       keys "type" and "units" are also recognized.
+	 +/
+	this(ref JsonValue jv){
+		name  = jv["name"].str;
+		value = jv["value"].str;
+		type  = ("type" in jv)  ? type  = propType(jv["type"].str) : PropType.STRING;
+		units = ("units" in jv) ? units = Units(jv["units"].str)   : UNIT_DIMENSIONLESS;
 	}
 
 	/++ 
@@ -764,37 +900,46 @@ unittest{
 	);
 }
 
-/+ Write a stream header and an arbitary number of properties to stdout +/
-void writeStreamHeader(StreamFmt SF)(auto ref Property[] aProp)
-{
-
-	if(aProp.length == 0){
-		writeStreamHeader!SF();
-		return;
-	}
-   
+void writeStreamHdr(StreamFmt SF)(
+	ref Appender!(ubyte[]) buf, auto ref Property[] pProp
+){
+	
    char[48] aTag;  // Tags are small, use static buffer
    char[]   pTag;  
-	ubyte[]  pPkt;  // Slower dynamic buffer for data since length is unk
+	ubyte[]  pPkt;  // Slower dynamic buffer for data since length is unknown
 	pPkt.reserve(1024);
 
 	static if(SF == StreamFmt.v30){
-		pPkt ~= "\n<stream version=\"3.0\" type=\"das-basic-stream\">\n  <properties>\n    ".r;
-		pPkt ~= aProp.map!( prop => prop.toString!SF()).join("\n    ").r;
-		pPkt ~= "\n  </properties>\n</stream>\n";
+		if(pProp.length == 0){
+			pPkt ~= "\n<stream version=\"3.0\" type=\"das-basic-stream\"/>\n".r;
+		}
+		else{
+			pPkt ~= "\n<stream version=\"3.0\" type=\"das-basic-stream\">\n  <properties>\n    ".r;
+			pPkt ~= pProp.map!( prop => prop.toString!SF()).join("\n    ").r;
+			pPkt ~= "\n  </properties>\n</stream>\n";
+		}
 
 		pTag = sformat!"|Sx||%d|"(aTag[], pPkt.length);
 	}
 	else {
-		pPkt ~= "<stream version=\"2.2\" >\n  <properties\n".r;
-		pPkt ~= aProp.map!( prop => prop.toString!SF()).join("\n    ").r;
+		pPkt ~= "<stream version=\"2.2\" >\n  <properties\n    ".r;
+		pPkt ~= pProp.map!( prop => prop.toString!SF()).join("\n    ").r;
 		pPkt ~= "\n  />\n</stream>\n";
 
 		pTag = sformat!"[00]%06d"(aTag[], pPkt.length);
 	}
 
-	pTag.copy(stdout.lockingBinaryWriter);
-	pPkt.copy(stdout.lockingBinaryWriter);
+	buf.put(cast(ubyte[])pTag);
+	buf.put(pPkt);
+}
+
+/+ Write a stream header and an arbitary number of properties to stdout +/
+void writeStreamHeader(StreamFmt SF)(auto ref Property[] pProp)
+{
+	Appender!(ubyte[]) buf;  // Heap based output buffer
+	writeStreamHeader!SF(buf, pProp);
+
+	stdout.rawWrite(buf[]);
 	stdout.flush();
 }
 
@@ -945,6 +1090,8 @@ size_t flushBinWriter(RoRoB)(RoRoB rrBytes){
 }
 
 /* Parsing & Streaming Binary Data **************************************** */
+
+
 
 /+ Handle extracting bit fields to a buffer.
  +
