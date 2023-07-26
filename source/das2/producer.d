@@ -17,7 +17,7 @@ import core.stdc.stdlib: exit;
 
 import std.algorithm: copy, map;
 import std.array:     appender, join, Appender;
-import std.bitmanip:  read, write;
+import std.bitmanip:  write;
 import std.conv:      ConvException, to;
 import std.exception: enforce;
 import std.file:      exists, isFile;

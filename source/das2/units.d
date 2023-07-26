@@ -54,7 +54,7 @@ struct Units {
 		return to!string(sBuf);
 	}
 	
-	/+ Generic value conversion utility
+	/++ Generic value conversion utility
 	 +
 	 + Converts a value in one set of different set of units to a value in 
 	 + these units.
