@@ -788,7 +788,7 @@ unittest{
 	);
 }
 
-void writeStreamHdr(StreamFmt SF)(
+void writeStreamHeader(StreamFmt SF)(
 	ref Appender!(ubyte[]) buf, auto ref Property[] pProp
 ){
 	
