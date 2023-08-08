@@ -16,7 +16,7 @@ module das2.producer;
 import core.stdc.stdlib: exit;
 
 import std.algorithm: copy, map;
-import std.array:     appender, join, Appender;
+import std.array:     appender, join, Appender, array;
 import std.bitmanip:  write;
 import std.conv:      ConvException, to;
 import std.exception: enforce;
@@ -90,6 +90,18 @@ PropType propType(string sPropType)
 	assert(0);
 }
 
+string toString(PropType pt){
+	switch(pt){
+		case PropType.BOOL:         return "bool";
+ 		case PropType.DATETIME:     return "datetime";
+ 		case PropType.DATETIME_RNG: return "datetimeRange";
+ 		case PropType.INT:          return "int";
+ 		case PropType.INT_RNG:      return "intRange";
+ 		case PropType.REAL:         return "real";
+ 		case PropType.REAL_RNG:     return "realRange";
+ 		default:                    return "string";
+ 	}
+}
 
 enum TagType {INVALID=0, Sx = 1, Hx = 2, Pd = 3, Cx = 4, Ex = 5, XX = 6 };
 
@@ -699,6 +711,37 @@ struct Property{
 		units = ("units" in jv) ? units = Units(jv["units"].str)   : UNIT_DIMENSIONLESS;
 	}
 
+	/++ Calls .toString() and uses encodeText on the result +/
+	string toXmlStr(StreamFmt SF)(){
+		static if(SF == StreamFmt.v22){
+			string sRaw = toString!SF();
+			return toUTF8(encodeText(sRaw).array);
+		}
+		else{
+			string sType = type.toString();
+ 			string sEncVal = toUTF8(encodeText(value).array);
+
+ 			if(sType != "string"){
+ 				if(units != UNIT_DIMENSIONLESS)
+ 					return format!"<p type=\"%s\" name=\"%s\" units=\"%s\">%s</p>"(
+ 						sType, name, units.toString(), sEncVal
+ 					);
+ 				else
+ 					return format!"<p type=\"%s\" name=\"%s\">%s</p>"(
+ 						sType, name, sEncVal
+ 					);
+ 			}
+ 			else{
+ 				if(units != UNIT_DIMENSIONLESS)
+ 					return format!"<p name=\"%s\" units=\"%s\">%s</p>"(
+ 						name, units.toString(), sEncVal
+ 					);
+ 				else
+ 					return format!"<p name=\"%s\">%s</p>"(name, sEncVal);
+ 			}
+		}
+	}
+
 	/++ 
 	Return the property as as string that is suitable for writing into
 	either a das 2.2 or 3.0 stream.  The output is one of:
@@ -712,18 +755,9 @@ struct Property{
 	string toString(StreamFmt SF)(){
 		string sType;
 		static if(SF == StreamFmt.v30){
- 			switch(type){
-	 		case PropType.BOOL:         sType = "bool";          break;
- 			case PropType.DATETIME:     sType = "datetime";      break;
- 			case PropType.DATETIME_RNG: sType = "datetimeRange"; break;
- 			case PropType.INT:          sType = "int";           break;
- 			case PropType.INT_RNG:      sType = "intRange";      break;
- 			case PropType.REAL:         sType = "real";          break;
- 			case PropType.REAL_RNG:     sType = "realRange";     break;
- 			default: break;
- 			}
+ 			sType = type.toString();
 
- 			if(sType.length > 0){
+ 			if(sType != "string"){
  				if(units != UNIT_DIMENSIONLESS)
  					return format!"<p type=\"%s\" name=\"%s\" units=\"%s\">%s</p>"(
  						sType, name, units.toString(), value
