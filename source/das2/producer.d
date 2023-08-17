@@ -610,7 +610,9 @@ else{
 	 + NOTE: This *also* clears the packet tag!
 	 +/
 	void send(File dest){
-		dest.write(bytes());
+		//dest.write(bytes());
+		//dest.flush();
+		bytes().copy(dest.lockingBinaryWriter);
 		dest.flush();
 		clear();
 	}
