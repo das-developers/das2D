@@ -192,7 +192,7 @@ bool getRdrOpts(StreamFmt SF, T...)(
 		_breakNrap(desc, cols, sind, sind) ~ "\n" ~
 		"OPTIONS\n";  // Deal with commands without options later
 
-	if(footer.length > 0) footer = "NOTES\n" ~ wrap(footer, cols, sind, dind);
+	if(footer.length > 0) footer = _breakNrap(footer, cols, sind, sind);
 
 	try{
 		rslt = getopt(aArgs, config.passThrough, config.caseSensitive, opts);
@@ -372,7 +372,7 @@ private S _breakNrap(S)(
 		map!(s => s.wrap(cols, firstindent, indent, tabsize)).
 		join();
 
-	// Final check, if a line contains only one work and the toUpper = the original
+	// Final check, if a line contains only one word and the toUpper = the original
 	// do not indent it.
 	string[] aLines;
 	foreach(sLine; s.split('\n')){
