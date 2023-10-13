@@ -714,29 +714,30 @@ struct Property{
 	}
 
 	/++ Calls .toString() and uses encodeText on the result +/
-	string toXmlStr(StreamFmt SF)(){
+	string toXmlStr(StreamFmt SF)(string sAxis = ""){
 		static if(SF == StreamFmt.v22){
-			string sRaw = toString!SF();
+			string sRaw = toString!SF(sAxis);
 			return toUTF8(encodeText(sRaw).array);
 		}
 		else{
 			string sType = type.toString();
  			string sEncVal = toUTF8(encodeText(value).array);
+ 			string sName = sAxis.length > 0 ?  sAxis ~ name[0..1].toUpper() ~ name[1..$] : name;
 
  			if(sType != "string"){
  				if(units != UNIT_DIMENSIONLESS)
  					return format!"<p type=\"%s\" name=\"%s\" units=\"%s\">%s</p>"(
- 						sType, name, units.toString(), sEncVal
+ 						sType, sName, units.toString(), sEncVal
  					);
  				else
  					return format!"<p type=\"%s\" name=\"%s\">%s</p>"(
- 						sType, name, sEncVal
+ 						sType, sName, sEncVal
  					);
  			}
  			else{
  				if(units != UNIT_DIMENSIONLESS)
  					return format!"<p name=\"%s\" units=\"%s\">%s</p>"(
- 						name, units.toString(), sEncVal
+ 						sName, units.toString(), sEncVal
  					);
  				else
  					return format!"<p name=\"%s\">%s</p>"(name, sEncVal);
@@ -748,31 +749,38 @@ struct Property{
 	Return the property as as string that is suitable for writing into
 	either a das 2.2 or 3.0 stream.  The output is one of:
 
-	Type:Name="value"                     // v2.2 (bad) attribute style
+	Type:(axis)Name="value"               // v2.2 (really bad) attribute style
 	<p type="Type" name="Name">Value</p>  // v3.0 element style
 
 	In either case, if the type is String, then the type is dropped
 	since that's the default in both systems.
+
+	Params:
+	   sAxis = The axis name to prepend to the property name.  This is often
+	           needed for das2 streams, unnecessary for das3 streams.
    +/
-	string toString(StreamFmt SF)(){
+	string toString(StreamFmt SF)(string sAxis = ""){
 		string sType;
+		
+		string sName = sAxis.length > 0 ? sAxis ~ name[0..1].toUpper() ~ name[1..$] : name;
+
 		static if(SF == StreamFmt.v30){
  			sType = type.toString();
 
  			if(sType != "string"){
  				if(units != UNIT_DIMENSIONLESS)
  					return format!"<p type=\"%s\" name=\"%s\" units=\"%s\">%s</p>"(
- 						sType, name, units.toString(), value
+ 						sType, sName, units.toString(), value
  					);
  				else
  					return format!"<p type=\"%s\" name=\"%s\">%s</p>"(
- 						sType, name, value
+ 						sType, sName, value
  					);
  			}
  			else{
  				if(units != UNIT_DIMENSIONLESS)
  					return format!"<p name=\"%s\" units=\"%s\">%s</p>"(
- 						name, units.toString(), value
+ 						sName, units.toString(), value
  					);
  				else
  					return format!"<p name=\"%s\">%s</p>"(name, value);
@@ -796,15 +804,15 @@ struct Property{
 
  			if(sType.length > 0){
  				if(units != UNIT_DIMENSIONLESS)
- 					return format!"%s:%s=\"%s %s\""(sType, name, value, units.toString());
+ 					return format!"%s:%s=\"%s %s\""(sType, sName, value, units.toString());
  				else
- 					return format!"%s:%s=\"%s\""(sType, name, value);
+ 					return format!"%s:%s=\"%s\""(sType, sName, value);
  			}
  			else{
  				if(units != UNIT_DIMENSIONLESS)
- 					return format!"%s=\"%s %s\""(name, value, units.toString());
+ 					return format!"%s=\"%s %s\""(sName, value, units.toString());
  				else
- 					return format!"%s=\"%s\""(name, value);
+ 					return format!"%s=\"%s\""(sName, value);
  			}
  		}
 	}
