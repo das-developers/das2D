@@ -421,8 +421,9 @@ class ProdException : Exception {
 	StreamExc category;
 	// One reason D rocks.  __file__ and __line__ below refer to the *call* site, 
 	// not this source file.
-	this(StreamExc, string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
+	this(StreamExc cat, string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
 		super(format!"[%s:%s] %s"(file, line, msg));
+		category = cat;
 	}
 }
 
@@ -653,6 +654,13 @@ struct Property{
 		units = Units(u); 
 		value = v; 
 	}
+
+	this(string n, string t, string v){
+		type = propType(t);
+		name = n; 
+		units = UNIT_DIMENSIONLESS; 
+		value = v; 
+	}	
 
 	this(string n, PropType t, string v, Units u = UNIT_DIMENSIONLESS){ 
 		name = n; type = t; units = u; value = v; 
