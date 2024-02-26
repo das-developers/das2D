@@ -29,7 +29,7 @@ import das2c;
 ## Building
 
 The main project is a source library, but some utilities are included.
-To build  these you'll have to provide the location to your libdas2.3.so file
+To build  these you'll have to provide the location to your libdas3.0.so file
 using the `LD_LIBRARY_PATH` environment variable.  For example, assume you've
 built das2C in your home directory with `N_ARCH` set to `ubuntu20`, then, to
 build this module's unit tests run:
@@ -122,13 +122,13 @@ Since your D program will depend on das2C and it's libraries, here's the
 rest of the command line arguments needed to link with das2C:
 
 ```bash
-dmd -i -I$(DINC) -L-L$(DAS2C_BUILD_DIR) -L-ldas2.3 -L-lexpat -L-lssl \
+dmd -i -I$(DINC) -L-L$(DAS2C_BUILD_DIR) -L-ldas3.0 -L-lexpat -L-lssl \
     -L-lcrypto -L-lfftw3 -L-lz -L-lm -L-lpthread
 ```
 
 This module uses the MIT license, but das2C is LGPL, you can avoid license
-entanglements by linking against the shared object `libdas2.3.so` instead of
-the static library `libdas2.3.a`.
+entanglements by linking against the shared object `libdas3.0.so` instead of
+the static library `libdas3.0.a`.
 
 
 ## Differences with das2C
