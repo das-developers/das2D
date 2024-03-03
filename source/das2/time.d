@@ -198,13 +198,15 @@ struct DasTime{
 
 		// Maybe trim sub-seconds
 		long iDot = lastIndexOf(s, '.');
+		if(iDot < 0)
+			iDot = lastIndexOf(s, ','); // also used in many locale's
 		assert(iDot > 0); // Unless something radically changes we can depend on this
 		long iEnd = s.length - 1;
 		while(iEnd > iDot){
 			if(s[iEnd] == '0') --iEnd;
 			else break;
 		}
-		if(s[iEnd] == '.')
+		if((s[iEnd] == '.')||(s[iEnd] == ','))
 			--iEnd; // Nix trailing '.' if no longer needed
 		else
 			return s[0..iEnd+1]; // have some sub-seconds
@@ -273,22 +275,23 @@ unittest{
 	import std.stdio;
 
 	string[] aExpect = [
-		"2022-07-19T17:43:35.345789", "2022-07-19T17:43:35.345789",
-		"2022-07-19T17:43:35.340000", "2022-07-19T17:43:35.34",
-		"2022-07-19T17:43:35.000000", "2022-07-19T17:43:35",
-		"2022-07-19T17:43:00.000000", "2022-07-19T17:43",
-		"2022-07-19T17:00:00.000000", "2022-07-19T17:00", // <-- not a typo
-		"2022-07-19T00:00:00.000000", "2022-07-19"
+		"2022-07-19T17:43:35.345789", "2022-07-19T17:43:35.345789", "2022-07-19T17:43:35,345789",
+		"2022-07-19T17:43:35.340000", "2022-07-19T17:43:35.34",     "2022-07-19T17:43:35,34",
+		"2022-07-19T17:43:35.000000", "2022-07-19T17:43:35",        "2022-07-19T17:43:35",
+		"2022-07-19T17:43:00.000000", "2022-07-19T17:43",           "2022-07-19T17:43",
+		"2022-07-19T17:00:00.000000", "2022-07-19T17:00", "2022-07-19T17:00", // <-- not a typo
+		"2022-07-19T00:00:00.000000", "2022-07-19", "2022-07-19"
 	];
 
 	DasTime dt;
 	string sTest;
-	for(int i = 0; i < aExpect.length/2; ++i){
-		dt = DasTime(aExpect[2*i]);
+	for(int i = 0; i < aExpect.length/3; ++i){
+		dt = DasTime(aExpect[3*i]);
 
 		sTest = dt.isoShort();
-		assert(sTest == aExpect[2*i+1], format!"ISO-shorten %s, expect %s, got %s"(
-			aExpect[2*i], aExpect[2*i+1], sTest
+		assert(sTest == aExpect[3*i+1] || sTest == aExpect[3*i+2], 
+		format!"ISO-shorten %s, expect %s (or %s), got %s"(
+			aExpect[3*i], aExpect[3*i+1], aExpect[3*i+2], sTest
 		));
 		writefln("INFO: %s --> %s", aExpect[2*i], sTest);
 	}
