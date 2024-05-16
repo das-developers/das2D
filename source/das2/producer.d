@@ -897,9 +897,8 @@ void writeStreamHeader(StreamFmt SF)()
 	stdout.flush();
 }
 
-int writeException(StreamFmt SF)(StreamExc et, string sMsg)
+int writeException(StreamFmt SF)(ref Appender!(ubyte[]) buf, StreamExc et, string sMsg)
 {
-
 	char[48] aTag;  // Tags are small, use static buffer
    char[]   pTag;  
 	ubyte[]  pPkt;  // Slower dynamic buffer for data since length is unk
@@ -918,8 +917,19 @@ int writeException(StreamFmt SF)(StreamExc et, string sMsg)
 		pTag = sformat!"[xx]%06d"(aTag[], pPkt.length);
 	}
 
-	pTag.copy(stdout.lockingBinaryWriter);
-	pPkt.copy(stdout.lockingBinaryWriter);
+	buf.put(cast(ubyte[])pTag);
+	buf.put(pPkt);
+
+	errorf("%s", sMsg.strip());
+	return 13;
+}
+
+int writeException(StreamFmt SF)(StreamExc et, string sMsg)
+{
+	Appender!(ubyte[]) buf;
+	writeException!SF(buf, et, sMsg);
+
+	stdout.rawWrite(buf[]);
 	stdout.flush();
 		
 	errorf("%s", sMsg.strip());
