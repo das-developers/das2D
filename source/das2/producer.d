@@ -60,7 +60,8 @@ enum StreamFmt {INVALID=0, v22=220, v30=300 };
  + which is the authoritative source of property types for das3 streams.
  +/
 enum PropType {
- 	STRING, BOOL, DATETIME, DATETIME_RNG, INT, INT_RNG, REAL, REAL_RNG
+ 	BOOL, BOOL_ARY, DATETIME, DATETIME_RNG, DATETIME_ARY, INT, INT_RNG, 
+ 	INT_ARY, REAL, REAL_RNG, REAL_ARY, STRING, STRING_ARY
 };
 
 PropType propType(string sPropType)
@@ -69,21 +70,42 @@ PropType propType(string sPropType)
 	case "s":        return PropType.STRING;
 	case "str":      return PropType.STRING;
 	case "string":   return PropType.STRING;
+	case "sa":       return PropType.STRING_ARY;
+	case "str_ary":  return PropType.STRING_ARY;
+	case "string_ary": return PropType.STRING_ARY;
+	case "stringArray": return PropType.STRING_ARY;
+
 	case "b":        return PropType.BOOL;
 	case "bool":     return PropType.BOOL;
+	case "ba":       return PropType.BOOL_ARY;
+	case "bool_ary": return PropType.BOOL_ARY;
+	case "boolArray": return PropType.BOOL_ARY;
+	
 	case "dt":       return PropType.DATETIME;
 	case "datetime": return PropType.DATETIME;
 	case "dtr":      return PropType.DATETIME_RNG;
 	case "datetime_rng": return PropType.DATETIME_RNG;
+	case "dta":      return PropType.DATETIME_ARY;
+	case "datetime_ary": return PropType.DATETIME_ARY;
+	case "datetimeArray": return PropType.DATETIME_ARY;
+
 	case "i":        return PropType.INT;
 	case "int":      return PropType.INT;
 	case "integer":  return PropType.INT;
 	case "ir":       return PropType.INT_RNG;
 	case "int_rng":  return PropType.INT_RNG;
+	case "ia":       return PropType.INT_ARY;
+	case "int_ary":  return PropType.INT_ARY;
+	case "integerArray":  return PropType.INT_ARY;
+	
 	case "r":        return PropType.REAL;
 	case "real":     return PropType.REAL;
 	case "rr":       return PropType.REAL_RNG;
 	case "real_rng": return PropType.REAL;
+	case "ra":       return PropType.REAL_ARY;
+	case "real_ary": return PropType.REAL_ARY;
+	case "realArray": return PropType.REAL_ARY;
+	
 	default:
 		enforce(false, format!"Unknown property type '%s'"(sPropType));
 	}
@@ -93,12 +115,16 @@ PropType propType(string sPropType)
 string toString(PropType pt){
 	switch(pt){
 		case PropType.BOOL:         return "bool";
+		case PropType.BOOL_ARY:     return "boolArray";
  		case PropType.DATETIME:     return "datetime";
  		case PropType.DATETIME_RNG: return "datetimeRange";
+ 		case PropType.DATETIME_ARY: return "datetimeArray";
  		case PropType.INT:          return "int";
- 		case PropType.INT_RNG:      return "intRange";
+ 		case PropType.INT_RNG:      return "integerRange";
+ 		case PropType.INT_ARY:      return "integerArray";
  		case PropType.REAL:         return "real";
  		case PropType.REAL_RNG:     return "realRange";
+ 		case PropType.REAL_ARY:     return "realArray";
  		default:                    return "string";
  	}
 }
@@ -110,6 +136,37 @@ enum TagType {INVALID=0, Sx = 1, Hx = 2, Pd = 3, Cx = 4, Ex = 5, XX = 6 };
  +  which is the authoritative upstream source.
  +/
 enum ValueType {UNKNOWN, BOOL, DATETIME, INT, REAL, STRING };
+
+/* Standard Vector Component Directions ************************************ */
+
+static const string[4][] g_pStdDirs = [
+	
+	/* ALL of these are listed in a RIGHT HANDED order ! */
+	[ "x",  "y",  "z"], /* cartesian        */
+	[ "ρ",  "ϕ",  "z"], /* cylindrical      */
+	[ "r",  "θ",  "ϕ"], /* spherical        */
+	[ "r",  "ϕ",  "θ"], /* (planeto)centric */
+	[ "ϕ",  "θ",  "a"], /* (planeto)detic   */
+	[ "ϕ",  "θ",  "a"]  /* (planeto)graphic */
+];
+
+// See also das_compsys_symbol() in vector.c of das2C
+string stdAxisSymbol(string sSystem, int iDir){
+
+	enforce( (iDir >= 0)&&(iDir < 3), format!"Invalid geometric axis index value: %d"(iDir));
+
+	switch(sSystem){
+	case "cartesian":   return g_pStdDirs[0][iDir];
+	case "cylindrical": return g_pStdDirs[1][iDir];
+	case "spherical":   return g_pStdDirs[2][iDir];
+	case "centric":     return g_pStdDirs[3][iDir];
+	case "graphic":     return g_pStdDirs[4][iDir];
+	default:
+		break;
+	}
+	enforce(false, format!"Unknown vector component system: '%s'"(sSystem));
+	return "";
+}
 
 
 /* Reader command line assistance ***************************************** */
@@ -698,10 +755,20 @@ struct Property{
 		name = n; units = u;
 		value = format!("%s to %s")(to!string(a), to!string(b));
 	}
+	this(string n, long[] a, Units u = UNIT_DIMENSIONLESS){
+		type = PropType.INT_ARY; 
+		name = n; units = u;
+		value = a.map!(s => format!"%s"(s)).array.join(";");
+	}
 	
 	this(string n, double a, double b, Units u = UNIT_DIMENSIONLESS){
 		type = PropType.REAL_RNG; name = n; units = u;
 		value = format!"%s to %s"(_formatReal(a), _formatReal(b));
+	}
+	this(string n, double[] a, Units u = UNIT_DIMENSIONLESS){
+		type = PropType.REAL_ARY; 
+		name = n; units = u;
+		value = a.map!(s => _formatReal(s)).array.join(";");
 	}
 	
 	this(string n, DasTime a, DasTime b, Units u = UNIT_DIMENSIONLESS){
@@ -709,7 +776,7 @@ struct Property{
 		value = format!("%s to %s")(a.isoShort(), b.isoShort());
 	}
 
-	/++ Create a property from a JSON Object 
+	/++ Create a property from a JSON Object
     + Params:
     +  jv = A JSON Object with at least the keys "name" & "value"  The 
     +       keys "type" and "units" are also recognized.
@@ -774,25 +841,20 @@ struct Property{
 
 		static if(SF == StreamFmt.v30){
  			sType = type.toString();
+ 			if(sType == "string") sType = "";
+ 			else sType = format!"type=\"%s\" "(sType);
 
- 			if(sType != "string"){
- 				if(units != UNIT_DIMENSIONLESS)
- 					return format!"<p type=\"%s\" name=\"%s\" units=\"%s\">%s</p>"(
- 						sType, sName, units.toString(), value
- 					);
- 				else
- 					return format!"<p type=\"%s\" name=\"%s\">%s</p>"(
- 						sType, sName, value
- 					);
- 			}
- 			else{
- 				if(units != UNIT_DIMENSIONLESS)
- 					return format!"<p name=\"%s\" units=\"%s\">%s</p>"(
- 						sName, units.toString(), value
- 					);
- 				else
- 					return format!"<p name=\"%s\">%s</p>"(name, value);
- 			}
+ 			string sUnits = "";
+ 			if(units != UNIT_DIMENSIONLESS)
+ 				sUnits = format!" units=\"%s\""(units.toString());
+
+ 			string sSep = "";
+ 			if((type == PropType.BOOL_ARY)||(type == PropType.STRING_ARY)||
+ 				(type == PropType.DATETIME_ARY)||(type == PropType.REAL_ARY)||
+ 				(type == PropType.INT_ARY))
+ 				sSep = format!("sep=\";\"");
+
+ 			return format!"<p %sname=\"%s\"%s>%s</p>"(sType, sName, sSep, value);
  		}
  		else{
  			switch(type){
@@ -807,7 +869,7 @@ struct Property{
  				sType = (units == UNIT_DIMENSIONLESS) ? "double" : "Datum";
  				break;
  			case PropType.REAL_RNG:     sType = "DatumRange";    break;
- 			default: break;
+ 			default: sType="String"; break;
  			}
 
  			if(sType.length > 0){
@@ -840,8 +902,48 @@ unittest{
 	);
 }
 
+/* Frame Definitions ******************************************************* */
+
+struct Frame {
+	Property[] props;
+	string name;
+	string body;
+	bool fixed;  // If true, the frame is afixed to the body and rotates with it
+
+	this(string sName, string sBody = "", bool bFixed = false, Property[] pProps = []){
+		name = sName;
+		body = sBody;
+		fixed = bFixed;
+		props = pProps;
+	}
+
+	string toString(StreamFmt SF)(string sIndent = "  ")
+	{
+		char[] pOut;
+		pOut.reserve = 256;
+		string sBody = "";
+		if(body.length > 0)
+			sBody = format!" body=\"%s\""(body);
+		string sFixed = "";
+		if(fixed) sFixed = " fixed=\"true\"";
+		
+		pOut ~= format!"%s<frame name=\"%s\"%s%s>\n"(sIndent, name, sBody, sFixed);
+
+		if(props.length > 0){
+			pOut ~= "    <properties>\n      ".r;
+			pOut ~= props.map!( prop => prop.toString!SF()).join("\n      ").r;
+			pOut ~= "\n    </properties>\n".r;
+		}
+
+		pOut ~= format!("%s</frame>\n")(sIndent);
+		return cast(string) pOut;
+	}
+};
+
+/* Writing Stream Headers ************************************************** */
+
 void writeStreamHeader(StreamFmt SF)(
-	ref Appender!(ubyte[]) buf, auto ref Property[] pProp
+	ref Appender!(ubyte[]) buf, auto ref Property[] pProp, auto ref Frame[] pFrame
 ){
 	
    char[48] aTag;  // Tags are small, use static buffer
@@ -850,21 +952,28 @@ void writeStreamHeader(StreamFmt SF)(
 	pPkt.reserve(1024);
 
 	static if(SF == StreamFmt.v30){
-		if(pProp.length == 0){
-			pPkt ~= "\n<stream version=\"3.0\" type=\"das-basic-stream\"/>\n".r;
-		}
-		else{
-			pPkt ~= "\n<stream version=\"3.0\" type=\"das-basic-stream\">\n  <properties>\n    ".r;
+		pPkt ~= "\n<stream version=\"3.0\" type=\"das-basic-stream\">\n".r;
+		if(pProp.length > 0){
+			pPkt ~= "  <properties>\n".r;
 			pPkt ~= pProp.map!( prop => prop.toString!SF()).join("\n    ").r;
-			pPkt ~= "\n  </properties>\n</stream>\n";
+			pPkt ~= "\n  </properties>\n".r;
 		}
+		foreach(ref frame; pFrame)
+			pPkt ~= frame.toString!SF();
+		pPkt ~= "</stream>\n".r;
 
 		pTag = sformat!"|Sx||%d|"(aTag[], pPkt.length);
 	}
 	else {
 		pPkt ~= "<stream version=\"2.2\" >\n  <properties\n    ".r;
 		pPkt ~= pProp.map!( prop => prop.toString!SF()).join("\n    ").r;
-		pPkt ~= "\n  />\n</stream>\n";
+		pPkt ~= "\n  />\n";
+		/* Hey man, no frames in das2.2...
+		foreach(ref frame; pFrame)
+			pPkt ~= frame.toString!SF();
+		*/
+		
+		pPkt ~= "</stream>\n".r;
 
 		pTag = sformat!"[00]%06d"(aTag[], pPkt.length);
 	}
@@ -877,11 +986,21 @@ void writeStreamHeader(StreamFmt SF)(
 void writeStreamHeader(StreamFmt SF)(auto ref Property[] pProp)
 {
 	Appender!(ubyte[]) buf;  // Heap based output buffer
-	writeStreamHeader!SF(buf, pProp);
+	writeStreamHeader!SF(buf, pProp, []);
 
 	stdout.rawWrite(buf[]);
 	stdout.flush();
 }
+
+void writeStreamHeader(StreamFmt SF)(auto ref Property[] pProp, ref Frame[] pFrame)
+{
+	Appender!(ubyte[]) buf;  // Heap based output buffer
+	writeStreamHeader!SF(buf, pProp, pFrame);
+
+	stdout.rawWrite(buf[]);
+	stdout.flush();
+}
+
 
 void writeStreamHeader(StreamFmt SF)()
 {
