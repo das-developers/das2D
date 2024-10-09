@@ -73,13 +73,13 @@ PropType propType(string sPropType)
 	case "sa":       return PropType.STRING_ARY;
 	case "str_ary":  return PropType.STRING_ARY;
 	case "string_ary": return PropType.STRING_ARY;
-	case "stringArray": return PropType.STRING_ARY;
+	case "stringarray": return PropType.STRING_ARY;
 
 	case "b":        return PropType.BOOL;
 	case "bool":     return PropType.BOOL;
 	case "ba":       return PropType.BOOL_ARY;
 	case "bool_ary": return PropType.BOOL_ARY;
-	case "boolArray": return PropType.BOOL_ARY;
+	case "boolarray": return PropType.BOOL_ARY;
 	
 	case "dt":       return PropType.DATETIME;
 	case "datetime": return PropType.DATETIME;
@@ -87,7 +87,7 @@ PropType propType(string sPropType)
 	case "datetime_rng": return PropType.DATETIME_RNG;
 	case "dta":      return PropType.DATETIME_ARY;
 	case "datetime_ary": return PropType.DATETIME_ARY;
-	case "datetimeArray": return PropType.DATETIME_ARY;
+	case "datetimearray": return PropType.DATETIME_ARY;
 
 	case "i":        return PropType.INT;
 	case "int":      return PropType.INT;
@@ -96,7 +96,7 @@ PropType propType(string sPropType)
 	case "int_rng":  return PropType.INT_RNG;
 	case "ia":       return PropType.INT_ARY;
 	case "int_ary":  return PropType.INT_ARY;
-	case "integerArray":  return PropType.INT_ARY;
+	case "integerarray":  return PropType.INT_ARY;
 	
 	case "r":        return PropType.REAL;
 	case "real":     return PropType.REAL;
@@ -104,7 +104,7 @@ PropType propType(string sPropType)
 	case "real_rng": return PropType.REAL;
 	case "ra":       return PropType.REAL_ARY;
 	case "real_ary": return PropType.REAL_ARY;
-	case "realArray": return PropType.REAL_ARY;
+	case "realarray": return PropType.REAL_ARY;
 	
 	default:
 		enforce(false, format!"Unknown property type '%s'"(sPropType));
