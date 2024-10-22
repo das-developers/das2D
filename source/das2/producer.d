@@ -143,11 +143,11 @@ static const string[4][] g_pStdDirs = [
 	
 	/* ALL of these are listed in a RIGHT HANDED order ! */
 	[ "x",  "y",  "z"], /* cartesian        */
-	[ "ρ",  "ϕ",  "z"], /* cylindrical      */
-	[ "r",  "θ",  "ϕ"], /* spherical        */
-	[ "r",  "ϕ",  "θ"], /* (planeto)centric */
-	[ "ϕ",  "θ",  "a"], /* (planeto)detic   */
-	[ "ϕ",  "θ",  "a"]  /* (planeto)graphic */
+	[ "ρ",  "φ",  "z"], /* cylindrical      */
+	[ "r",  "θ",  "φ"], /* spherical        */
+	[ "r",  "φ",  "θ"], /* (planeto)centric */
+	[ "φ",  "θ",  "a"], /* (planeto)detic   */
+	[ "φ",  "θ",  "a"]  /* (planeto)graphic */
 ];
 
 // See also das_compsys_symbol() in vector.c of das2C
