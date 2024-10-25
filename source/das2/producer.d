@@ -119,7 +119,7 @@ string toString(PropType pt){
  		case PropType.DATETIME:     return "datetime";
  		case PropType.DATETIME_RNG: return "datetimeRange";
  		case PropType.DATETIME_ARY: return "datetimeArray";
- 		case PropType.INT:          return "int";
+ 		case PropType.INT:          return "integer";
  		case PropType.INT_RNG:      return "integerRange";
  		case PropType.INT_ARY:      return "integerArray";
  		case PropType.REAL:         return "real";
@@ -862,7 +862,7 @@ struct Property{
  			case PropType.DATETIME:     sType = "Time";          break;
  			case PropType.DATETIME_RNG: sType = "TimeRange";     break;
  			case PropType.INT:
- 				sType = (units == UNIT_DIMENSIONLESS) ? "int" : "Datum";
+ 				sType = (units == UNIT_DIMENSIONLESS) ? "integer" : "Datum";
  				break;
  			case PropType.INT_RNG:      sType = "DatumRange";    break;
  			case PropType.REAL:
