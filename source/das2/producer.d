@@ -954,7 +954,7 @@ void writeStreamHeader(StreamFmt SF)(
 	static if(SF == StreamFmt.v30){
 		pPkt ~= "\n<stream version=\"3.0\" type=\"das-basic-stream\">\n".r;
 		if(pProp.length > 0){
-			pPkt ~= "  <properties>\n".r;
+			pPkt ~= "  <properties>\n    ".r;
 			pPkt ~= pProp.map!( prop => prop.toString!SF()).join("\n    ").r;
 			pPkt ~= "\n  </properties>\n".r;
 		}
