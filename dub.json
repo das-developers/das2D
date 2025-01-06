@@ -1,6 +1,6 @@
 {
 	"authors": ["Chris Piker"],
-	"dependencies": { "dxml": "*" },
+	"dependencies": { "dxml": {"path":"../dxml"}},
 	"description": "D extensions for the das2C library",
 	"license": "MIT",
 	"name": "das2",
