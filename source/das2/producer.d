@@ -36,7 +36,7 @@ import std.utf:       toUTF8;
 
 import dxml.util:     encodeText;
 
-import das2.log:      errorf;
+import das2.log:      infof, errorf;
 import das2.time:     DasTime;
 import das2.units:    Units, UNIT_DIMENSIONLESS;
 import das2.util:     DasException;
@@ -1039,8 +1039,14 @@ int writeException(StreamFmt SF)(ref Appender!(ubyte[]) buf, StreamExc et, strin
 	buf.put(cast(ubyte[])pTag);
 	buf.put(pPkt);
 
-	errorf("%s", sMsg.strip());
-	return 13;
+	if(et.NoData){
+		infof("%s", sMsg.strip());
+		return 0;
+	}
+	else{
+		errorf("%s", sMsg.strip());
+		return 13;
+	}
 }
 
 int writeException(StreamFmt SF)(StreamExc et, string sMsg)
@@ -1051,8 +1057,14 @@ int writeException(StreamFmt SF)(StreamExc et, string sMsg)
 	stdout.rawWrite(buf[]);
 	stdout.flush();
 		
-	errorf("%s", sMsg.strip());
-	return 13;
+	if(et.NoData){
+		infof("%s", sMsg.strip());
+		return 0;
+	}
+	else{
+		errorf("%s", sMsg.strip());
+		return 13;
+	}
 }
 
 int writeException(StreamFmt SF)(
