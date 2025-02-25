@@ -862,7 +862,7 @@ struct Property{
  			case PropType.DATETIME:     sType = "Time";          break;
  			case PropType.DATETIME_RNG: sType = "TimeRange";     break;
  			case PropType.INT:
- 				sType = (units == UNIT_DIMENSIONLESS) ? "integer" : "Datum";
+ 				sType = (units == UNIT_DIMENSIONLESS) ? "int" : "Datum";
  				break;
  			case PropType.INT_RNG:      sType = "DatumRange";    break;
  			case PropType.REAL:
