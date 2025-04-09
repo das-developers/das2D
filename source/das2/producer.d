@@ -942,6 +942,18 @@ struct Frame {
 
 /* Writing Stream Headers ************************************************** */
 
+private ubyte[] _propEncode(StreamFmt SF)(auto ref Property[] pProp)
+{
+	// First write the properties as an associative array, that way duplicates
+	// are removed.
+	string[string] mProps;
+	foreach(ref prop; pProp)
+		mProps[prop.name] = prop.toString!SF();
+
+	ubyte[] pEnc = mProps.values.join("\n    ").dup.r;
+	return pEnc;
+}
+
 void writeStreamHeader(StreamFmt SF)(
 	ref Appender!(ubyte[]) buf, auto ref Property[] pProp, auto ref Frame[] pFrame
 ){
@@ -955,7 +967,7 @@ void writeStreamHeader(StreamFmt SF)(
 		pPkt ~= "\n<stream version=\"3.0\" type=\"das-basic-stream\">\n".r;
 		if(pProp.length > 0){
 			pPkt ~= "  <properties>\n    ".r;
-			pPkt ~= pProp.map!( prop => prop.toString!SF()).join("\n    ").r;
+			pPkt ~= _propEncode!SF(pProp);
 			pPkt ~= "\n  </properties>\n".r;
 		}
 		foreach(ref frame; pFrame)
@@ -966,7 +978,7 @@ void writeStreamHeader(StreamFmt SF)(
 	}
 	else {
 		pPkt ~= "<stream version=\"2.2\" >\n  <properties\n    ".r;
-		pPkt ~= pProp.map!( prop => prop.toString!SF()).join("\n    ").r;
+		pPkt ~= _propEncode!SF(pProp);
 		pPkt ~= "\n  />\n";
 		/* Hey man, no frames in das2.2...
 		foreach(ref frame; pFrame)
