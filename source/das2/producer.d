@@ -686,6 +686,7 @@ struct Property{
 	string name;
 	PropType type;
 	string value;
+	string sep; // Only used with string array properties
 	Units units;
 
 	string _formatReal(double rValue){
@@ -725,8 +726,14 @@ struct Property{
 
 	/++ Shortcut for string properties +/
 	this(string n, string v, Units u = UNIT_DIMENSIONLESS){
-		type = PropType.STRING; name = n; units = u;
-		value = v;
+		type = PropType.STRING; name = n; units = u; value = v; 
+	}
+
+	/++ String array property constructor +/
+	this(string n, string[] v, string s = " ", Units u = UNIT_DIMENSIONLESS){
+		type = PropType.STRING_ARY; name = n; units = u;
+		sep = (s.length > 0) ? s[0..1] : " ";
+		value = v.join(s);
 	}
 
 	this(string n, long v, Units u = UNIT_DIMENSIONLESS){
