@@ -258,7 +258,6 @@ shared static this()
 
 	UNIT_US2000 = cast(immutable) Units(das2c.units.UNIT_US2000);
 	UNIT_HERTZ  = cast(immutable) Units(das2c.units.UNIT_HERTZ);
-	UNIT_US2000 = cast(immutable) Units(das2c.units.UNIT_US2000);
 	UNIT_MJ1958 = cast(immutable) Units(das2c.units.UNIT_MJ1958);
 	UNIT_T2000  = cast(immutable) Units(das2c.units.UNIT_T2000);
 	UNIT_T1970  = cast(immutable) Units(das2c.units.UNIT_T1970);
