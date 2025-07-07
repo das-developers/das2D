@@ -260,6 +260,18 @@ double dt_ttime (const(das_time)* dt);
  */
 void dt_emitt (double tt, das_time* dt);
 
+/** Convert a time structure to a TT2000 time 
+ * 
+ * @memberof das_time
+ */
+long dt_to_tt2k(const(das_time)* dt);
+
+/** Convert a TT2000 time to a time structure
+ * 
+ * @memberof das_time
+ */
+void dt_from_tt2k(das_time* dt, long nTime);
+
 /** Normalize date and time components
  *
  *  Call this function after manipulating time structure values directly

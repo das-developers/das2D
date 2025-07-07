@@ -47,6 +47,24 @@ struct Units {
 		Units_convertToDt(&(t.dt), rTime, du);
 		return t;
 	}
+
+	DasTime toTime(long nTime) const {
+		if(!Units_haveCalRep(du)){
+			throw new ConvException(
+				format!"Units %s not convertable to a calendar time."(this)
+			);
+		}
+		DasTime t;
+		if(du == das2c.units.UNIT_TT2000)
+			dt_from_tt2k(&(t.dt), nTime);
+		else
+			// In general long integer units can't handle the pass through
+			// conversion to doubles!  Das2C needs a new set of time 
+			// routines that take and return long integers! 
+			Units_convertToDt(&(t.dt), to!double(nTime), du);
+			
+		return t;
+	}
 	
 	string toLabel() const {
 		char[64] sBuf;
