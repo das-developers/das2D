@@ -253,20 +253,36 @@ struct DasTime{
 		else static assert(false, "Only subtraction is defined for two das2 times");
 	}
 	
-	DasTime opBinary(string op)(double other) const {
+	DasTime opBinary(string op)(double secs) const {
 		static if(op == "+"){
 			das_time dt_new = dt;
-			dt_new.second += other;
+			dt_new.second += secs;
 			dt_tnorm(&dt_new);
 			return DasTime(dt_new);
 		}
 		else static if(op == "-"){
 			das_time dt_new = dt;
-			dt_new.second -= other;
+			dt_new.second -= secs;
 			dt_tnorm(&dt_new);
 			return DasTime(dt_new);
 		}
 		else static assert(false, "Operator "~op~" not implemented");
+	}
+
+	void opOpAssign(string op)(double secs) {
+		static if (op == "+"){
+			dt.second += secs;
+			dt_tnorm(&dt);
+		}
+		else static if (op == "-"){
+			dt.second -= secs;
+			dt_tnorm(&dt);	
+		}
+		else static assert(false, "Operator "~op~" not implemented");
+	}
+
+	long toTt2k() const {
+		return dt_to_tt2k(&dt);
 	}
 };
 
