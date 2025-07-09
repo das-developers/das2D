@@ -140,13 +140,22 @@ struct DasTime{
 
 	/** Construct a time value using a string */
 	this(const(char)[] s){
-		// Allow now as a time
-		if(s == "now"){
-			dt_now(&dt);
-		}
-		else{
+		// Allow now and forever as times
+		switch(s){
+		case "now": dt_now(&dt); break;
+		case "forever": 
+			dt.year = 3000; 
+			dt.month = 1;
+			dt.mday = 1;
+			dt.yday = 1;
+			dt.hour = 0;
+			dt.minute = 0;
+			dt.second = 0.0;
+			break;
+		default:
 			if(!dt_parsetime(s.toStringz(), &dt))
 				throw new ConvException(format("Error parsing %s as a date-time", s));
+			break;
 		}
 	}
 
