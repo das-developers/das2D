@@ -12,6 +12,16 @@ import std.exception;
 
 import das2c.log;
 
+public import das2c.log: 
+	DASLOG_NOTHING,
+	DASLOG_CRIT, 
+	DASLOG_ERROR,
+	DASLOG_WARN,
+	DASLOG_INFO, 
+	DASLOG_DEBUG,
+	DASLOG_TRACE;
+
+
 void tracef(string file=__FILE__, size_t line=__LINE__, T...)(T args)
 {
 	daslog(DASLOG_TRACE, file.toStringz(), line, format(args).toStringz());
