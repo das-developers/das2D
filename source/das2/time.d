@@ -4,6 +4,7 @@ public import std.conv: ConvException;
 
 import core.stdc.string;
 
+import std.exception: enforce;
 import std.format: format;
 import std.math;
 import std.string: lastIndexOf, toStringz;
@@ -321,4 +322,86 @@ unittest{
 		writefln("INFO: %s --> %s", aExpect[2*i], sTest);
 	}
 	writefln("INFO: das2.time unittest passed");
+}
+
+/+ Convert a single unix time to TT2000.
+ + 
+ + This function only works for positive unix times.  Points before 1970-01-01
+ + are not handled.
+ +/
+long unixTott2k(int unix_sec, int micro_sec)
+{
+	// Desending order offset times.  Mapping between unix time and TT2000
+	// proceeds at constant rate of 1e9 to 1 after each leap second.  The
+	// Each line in the chart below represents the instant in time *after*
+	// each leap second.  Prior to 1972-01-01 the rate of UNIX ticks to
+	// TT2000 ticks is not 1e9, but some other value that I don't know.
+	
+	enum int nOffsets = 29;
+	const long[2][nOffsets] offsets = [
+		[ 1483228800L ,  536500869184000000L ], // 2017-01-01    0 
+		[ 1435708800L ,  488980868184000000L ], // 2015-07-01    1
+		[ 1341100800L ,  394372867184000000L ], // 2012-07-01    2
+		[ 1230768000L ,  284040066184000000L ], // 2009-01-01    3
+		[ 1136073600L ,  189345665184000000L ], // 2006-01-01    4
+		[  915148800L ,  -31579135816000000L ], // 1999-01-01    5
+		[  867715200L ,  -79012736816000000L ], // 1997-07-01    6
+		[  820454400L , -126273537816000000L ], // 1996-01-01    7
+		[  773020800L , -173707138816000000L ], // 1994-07-01    8
+		[  741484800L , -205243139816000000L ], // 1993-07-01    9
+		[  709948800L , -236779140816000000L ], // 1992-07-01   10
+		[  662688000L , -284039941816000000L ], // 1991-01-01   11
+		[  631152000L , -315575942816000000L ], // 1990-01-01   12
+		[  567993600L , -378734343816000000L ], // 1988-01-01   13
+		[  489024000L , -457703944816000000L ], // 1985-07-01   14
+		[  425865600L , -520862345816000000L ], // 1983-07-01   15
+		[  394329600L , -552398346816000000L ], // 1982-07-01   16
+		[  362793600L , -583934347816000000L ], // 1981-07-01   17
+		[  315532800L , -631195148816000000L ], // 1980-01-01   18
+		[  283996800L , -662731149816000000L ], // 1979-01-01   19
+		[  252460800L , -694267150816000000L ], // 1978-01-01   20
+		[  220924800L , -725803151816000000L ], // 1977-01-01   21
+		[  189302400L , -757425552816000000L ], // 1976-01-01   22
+		[  157766400L , -788961553816000000L ], // 1975-01-01   23
+		[  126230400L , -820497554816000000L ], // 1974-01-01   24
+		[   94694400L , -852033555816000000L ], // 1973-01-01   25
+		[   78796800L , -867931156816000000L ], // 1972-07-01   26
+		[   63072000L , -883655957816000000L ], // 1972-01-01   27
+		// Mapping is not linear for dates below Jan. 1st, 1972. The actual 
+		// mapping is:
+		//[          0L , -946727959814622001L ] // 1970-01-01   28
+		// but we want a constant slope of 1e9, so using this value instead:
+		[          0L , -946727958816000000L ] // 1970-01-01    28
+	];
+
+	int i;
+	for(i = 0; i < nOffsets; ++i)
+		if(unix_sec >= offsets[i][0]) break;
+
+	long tt2k;
+	if( i >= nOffsets ){
+		// Handle negative times, since I guess that's a thing for really bad packets
+		assert(unix_sec <= 0, "Time handling logic error");
+
+		// Leap seconds weren't a thing before 1970, use whole unix time
+		tt2k = unix_sec*1_000_000_000L + offsets[nOffsets-1][1];
+	}
+	else{
+		tt2k = (unix_sec - offsets[i][0])*1_000_000_000L + offsets[i][1];
+	}
+
+	tt2k += micro_sec * 1000;
+	return tt2k;
+}
+
+unittest {
+	import std.stdio;
+
+	// Check that the 2016-12-31T23:59:60 leap second is skipped, unixtime
+	// can't actually represent a leap second, so check differences
+	long ttPreLeap  = unixTott2k(1483228799, 0);
+	long ttPostLeap = unixTott2k(1483228800, 0);
+	writeln(ttPreLeap, "  ", ttPostLeap, "  ", ttPostLeap - ttPreLeap);
+	enforce(ttPostLeap - ttPreLeap == 2_000_000_000, "Leap second not skipped");
+
 }
