@@ -843,6 +843,7 @@ struct Property{
    +/
 	string toString(StreamFmt SF)(string sAxis = ""){
 		string sType;
+		long nTmp;
 		
 		string sName = sAxis.length > 0 ? sAxis ~ name[0..1].toUpper() ~ name[1..$] : name;
 
@@ -868,8 +869,16 @@ struct Property{
 	 		case PropType.BOOL:         sType = "boolean";       break;
  			case PropType.DATETIME:     sType = "Time";          break;
  			case PropType.DATETIME_RNG: sType = "TimeRange";     break;
+
+ 			// Note: das2 is very much limited by Java capabilities.  If we 
+ 			// have a values that's above the unsigned integer limit convert it 
+ 			// to a float.
  			case PropType.INT:
- 				sType = (units == UNIT_DIMENSIONLESS) ? "int" : "Datum";
+ 				nTmp = to!long(value);
+ 				if(nTmp > 2_147_483_647L)
+ 					sType = (units == UNIT_DIMENSIONLESS) ? "double" : "Datum";
+ 				else
+ 					sType = (units == UNIT_DIMENSIONLESS) ? "int" : "Datum";
  				break;
  			case PropType.INT_RNG:      sType = "DatumRange";    break;
  			case PropType.REAL:
