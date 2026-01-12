@@ -13,7 +13,7 @@
 			"name":"minimum",
 			"targetType": "sourceLibrary",
 			"libs":[
-				"das3.0", "fftw3",  "expat", "ssl", "crypto", "z", "m", "pthread"
+				"das3", "fftw3",  "expat", "ssl", "crypto", "z", "m", "pthread"
 			],
 			"excludedSourceFiles":["das2c/spice.d"]
 		},
