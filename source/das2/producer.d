@@ -125,6 +125,7 @@ string toString(PropType pt){
  		case PropType.REAL:         return "real";
  		case PropType.REAL_RNG:     return "realRange";
  		case PropType.REAL_ARY:     return "realArray";
+ 		case PropType.STRING_ARY:   return "stringArray";
  		default:                    return "string";
  	}
 }
@@ -795,6 +796,25 @@ struct Property{
 		units = ("units" in jv) ? units = Units(jv["units"].str)   : UNIT_DIMENSIONLESS;
 	}
 
+	/++ The " sep=..." attribute for a das3 set property, else "".  Emitted only
+	 + for array types whose separator isn't the schema default (a space); the
+	 + non-printable separators are escaped, mirroring das2C. +/
+	private string _sepAttrV30(){
+		bool bSet = (type == PropType.BOOL_ARY)||(type == PropType.DATETIME_ARY)
+		         || (type == PropType.INT_ARY) ||(type == PropType.REAL_ARY)
+		         || (type == PropType.STRING_ARY);
+		if(!bSet || (sep.length == 0) || (sep == " ")) return "";
+		string sEsc;
+		switch(sep[0]){
+		case '\n': sEsc = "\\n";  break;
+		case '\t': sEsc = "\\t";  break;
+		case '\r': sEsc = "\\r";  break;
+		case '\\': sEsc = "\\\\"; break;
+		default:   sEsc = sep[0..1]; break;
+		}
+		return format!" sep=\"%s\""(sEsc);
+	}
+
 	/++ Calls .toString() and uses encodeText on the result +/
 	string toXmlStr(StreamFmt SF)(string sAxis = ""){
 		static if(SF == StreamFmt.v22){
@@ -805,15 +825,16 @@ struct Property{
 			string sType = type.toString();
  			string sEncVal = toUTF8(encodeText(value).array);
  			string sName = sAxis.length > 0 ?  sAxis ~ name[0..1].toUpper() ~ name[1..$] : name;
+ 			string sSep = _sepAttrV30();
 
  			if(sType != "string"){
  				if(units != UNIT_DIMENSIONLESS)
- 					return format!"<p type=\"%s\" name=\"%s\" units=\"%s\">%s</p>"(
- 						sType, sName, units.toString(), sEncVal
+ 					return format!"<p type=\"%s\" name=\"%s\" units=\"%s\"%s>%s</p>"(
+ 						sType, sName, units.toString(), sSep, sEncVal
  					);
  				else
- 					return format!"<p type=\"%s\" name=\"%s\">%s</p>"(
- 						sType, sName, sEncVal
+ 					return format!"<p type=\"%s\" name=\"%s\"%s>%s</p>"(
+ 						sType, sName, sSep, sEncVal
  					);
  			}
  			else{
@@ -913,9 +934,30 @@ unittest{
 
 	Property p = Property("length", 1.34);
 
-	assert((p.value == "1.34e+00")||(p.value == "1.34E+00"), 
+	assert((p.value == "1.34e+00")||(p.value == "1.34E+00"),
 		format!"Unexpected p.value: %s"(p.value)
 	);
+}
+
+unittest{
+	// das3 set properties emit their separator only when it isn't the schema
+	// default (a space); single/whitespace-separated props carry no sep=.
+	import std.algorithm.searching: canFind;
+
+	string sSemi = Property("labels", ["Bx","By","Bz"], ";").toXmlStr!(StreamFmt.v30)();
+	assert(sSemi.canFind(`type="stringArray"`), sSemi);
+	assert(sSemi.canFind(`sep=";"`), sSemi);
+
+	// newline separator escapes to the two-char \n on the wire
+	string sNl = Property("notes", ["a","b"], "\n").toXmlStr!(StreamFmt.v30)();
+	assert(sNl.canFind(`sep="\n"`), sNl);
+
+	// default space separator -> omitted
+	string sSpace = Property("words", ["a","b"], " ").toXmlStr!(StreamFmt.v30)();
+	assert(!sSpace.canFind("sep="), sSpace);
+
+	// single string is never a set -> no sep
+	assert(!Property("note", "hello").toXmlStr!(StreamFmt.v30)().canFind("sep="));
 }
 
 /* Frame Definitions ******************************************************* */
