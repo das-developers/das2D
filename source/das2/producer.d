@@ -706,12 +706,15 @@ struct Property{
 		return value;
 	}
 
-	/++ a string based constructer, understands das-telem type codes +/
-	this(string n, string t, string v, string u){
+	/++ a string based constructer, understands das-telem type codes.  The
+	 + optional s is the array separator (the das-telem `psep` column); it is
+	 + ignored for non-array types, which leave it null/empty. +/
+	this(string n, string t, string v, string u, string s = ""){
 		type = propType(t);
-		name = n; 
-		units = Units(u); 
-		value = v; 
+		name = n;
+		units = Units(u);
+		value = v;
+		if(s.length > 0) sep = s[0..1];
 	}
 
 	this(string n, string t, string v){
