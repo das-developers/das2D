@@ -813,6 +813,12 @@ struct Property{
 		case '\t': sEsc = "\\t";  break;
 		case '\r': sEsc = "\\r";  break;
 		case '\\': sEsc = "\\\\"; break;
+		// XML-special printables: the value is double-quoted, so escape & " < >
+		// (a bare apostrophe is fine inside double quotes).
+		case '&':  sEsc = "&amp;";  break;
+		case '"':  sEsc = "&quot;"; break;
+		case '<':  sEsc = "&lt;";   break;
+		case '>':  sEsc = "&gt;";   break;
 		default:   sEsc = sep[0..1]; break;
 		}
 		return format!" sep=\"%s\""(sEsc);
@@ -961,6 +967,13 @@ unittest{
 
 	// single string is never a set -> no sep
 	assert(!Property("note", "hello").toXmlStr!(StreamFmt.v30)().canFind("sep="));
+
+	// XML-special separators must be entity-escaped in the attribute (the value
+	// is double-quoted, so & " < > all need escaping).
+	assert(Property("u", ["a","b"], "&").toXmlStr!(StreamFmt.v30)().canFind(`sep="&amp;"`));
+	assert(Property("u", ["a","b"], `"`).toXmlStr!(StreamFmt.v30)().canFind(`sep="&quot;"`));
+	assert(Property("u", ["a","b"], "<").toXmlStr!(StreamFmt.v30)().canFind(`sep="&lt;"`));
+	assert(Property("u", ["a","b"], ">").toXmlStr!(StreamFmt.v30)().canFind(`sep="&gt;"`));
 }
 
 /* Frame Definitions ******************************************************* */
