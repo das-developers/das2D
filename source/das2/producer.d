@@ -24,7 +24,7 @@ import std.file:      exists, isFile;
 import std.format:    format, sformat;
 import std.getopt:    getopt, config, GetoptResult, Option;
 import std.json:      JSONValue;
-import std.range:     ElementType, isInputRange;
+import std.range:     ElementEncodingType, ElementType, isInputRange;
 import std.regex:     regex, splitter;
 import std.stdio:     File, stderr, stdout;
 import std.string:    CaseSensitive, indexOf, replace, representation, startsWith, 
@@ -536,8 +536,9 @@ else{
 	}
 	
 	/+ Write data to the buffer.  Binary items are written as little endian
-	 + by default, but this can be set via template parameter.  For strings
-	 + the encoding is ignored.
+	 + by default, but this can be set via template parameter.  Strings are
+	 + always written as utf-8, which is the only text encoding das2 and das3
+	 + streams accept, so the endian parameter does not apply to them.
 	 +/
 	void write(Endian endian = LE, T...)(T args){
 		
@@ -548,10 +549,15 @@ else{
 			
 			static if(SV == StreamFmt.v22){
 				// das v2 supports encoding:
-				//    arrays of ubytes (essentially pass through), arrays of floats,
-				//    arrays of doubles (and single elements of each)
+				//    text (utf-8), arrays of ubytes (essentially pass through),
+				//    arrays of floats, arrays of doubles (and single elements of each)
 				// It does not support integers of any sort
-				static if( isArray!(T[I])){
+				static if( isSomeString!(T[I]) ){
+					// Legal.  Note this case used to fall through to the array
+					// test below and pass only because is(dchar : float) is true,
+					// which is also how strings reached the UTF-32 write path.
+				}
+				else static if( isArray!(T[I])){
 					static assert(
 					is(ElementType!(T[I]) : float)  || 
 					is(ElementType!(T[I]) : double) ||
@@ -568,7 +574,34 @@ else{
 			}
 			
 			// Each arg can be a single item, or an array of items.
-			static if( isArray!(T[I])){
+
+			// Strings come first because std.range auto-decodes them: for any
+			// narrow string ElementType is dchar, so the array branch below
+			// would emit four UTF-32 code units per character, corrupting the
+			// stream and overrunning a stack buffer sized in characters.
+			// das2/das3 text is utf-8 only, so normalize to that here.
+			static if( isSomeString!(T[I]) ){
+
+				// char[] and string are already utf-8 and pass through without a
+				// copy.  Wide strings are transcoded, which allocates, but no
+				// das2 producer feeds those to a packet in practice.
+				static if(is(immutable(ElementEncodingType!(T[I])) == immutable(char)))
+					auto units = arg.representation;
+				else
+					auto units = toUTF8(arg).representation;
+
+				static if (buf_sz == USE_HEAP){  // Grow if needed
+					if(_buf.length < _iMsgWrite + units.length){
+						_buf.length = _iMsgWrite + units.length;
+					}
+				}
+
+				for(size_t i = 0; i < units.length; ++i){
+					_buf[_iMsgWrite] = units[i];
+					++_iMsgWrite;
+				}
+			}
+			else static if( isArray!(T[I])){
 
 				// Skip bit manipulation for single byte types
 				static if( (ElementType!(T[I])).sizeof == 1){
@@ -974,6 +1007,35 @@ unittest{
 	assert(Property("u", ["a","b"], `"`).toXmlStr!(StreamFmt.v30)().canFind(`sep="&quot;"`));
 	assert(Property("u", ["a","b"], "<").toXmlStr!(StreamFmt.v30)().canFind(`sep="&lt;"`));
 	assert(Property("u", ["a","b"], ">").toXmlStr!(StreamFmt.v30)().canFind(`sep="&gt;"`));
+}
+
+unittest{
+	// std.range auto-decodes narrow strings, so ElementType!string is dchar.
+	// A bare string handed to PktBuf.write used to take the multi-byte path
+	// and emit four UTF-32 code units per character: garbage on the wire, and
+	// a buffer overrun once the character count times four passed a stack
+	// buffer sized in bytes.  Text goes out as utf-8 and costs exactly its
+	// code-unit count.
+	enum string sTime = "2022-02-24T23:00:00.000 ";
+
+	PktBuf!(128, StreamFmt.v22) pStr;
+	pStr.tag(TagType.Pd, 1);
+	pStr.write(sTime);
+	assert(cast(string) pStr.bytes() == ":01:" ~ sTime, cast(string) pStr.bytes());
+
+	// Handing over text or its representation must land the same bytes.
+	PktBuf!(128, StreamFmt.v22) pRep;
+	pRep.tag(TagType.Pd, 1);
+	pRep.write(sTime.representation);
+	assert(pStr.bytes() == pRep.bytes());
+
+	// Multi-byte utf-8 passes through intact, and a wide string is transcoded
+	// rather than dumped as code points.  The das3 tag carries the payload
+	// length, so it doubles as the byte count check: B is 1, U+03B8 is 2.
+	PktBuf!(128, StreamFmt.v30) pWide;
+	pWide.tag(TagType.Pd, 2);
+	pWide.write("B\u03b8"w);
+	assert(cast(string) pWide.bytes() == "|Pd|2|3|B\u03b8", cast(string) pWide.bytes());
 }
 
 /* Frame Definitions ******************************************************* */
