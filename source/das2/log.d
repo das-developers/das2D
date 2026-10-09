@@ -21,35 +21,39 @@ public import das2c.log:
 	DASLOG_DEBUG,
 	DASLOG_TRACE;
 
+/* daslog() is printf-like, so the message D has already formatted goes in as
+ * an argument to "%s", never as the format itself.  Otherwise any '%' in the
+ * text (a "15.0% floor", or a value read from a file or DB) gets formatted a
+ * second time. */
 
 void tracef(string file=__FILE__, size_t line=__LINE__, T...)(T args)
 {
-	daslog(DASLOG_TRACE, file.toStringz(), line, format(args).toStringz());
+	daslog(DASLOG_TRACE, file.toStringz(), line, "%s", format(args).toStringz());
 }
 
 void debugf(string file=__FILE__, size_t line=__LINE__, T...)(T args)
 {
-	daslog(DASLOG_DEBUG, file.toStringz(), line, format(args).toStringz());
+	daslog(DASLOG_DEBUG, file.toStringz(), line, "%s", format(args).toStringz());
 }
 
 void infof(string file=__FILE__, size_t line=__LINE__, T...)(T args)
 {
-	daslog(DASLOG_INFO, file.toStringz(), line, format(args).toStringz());
+	daslog(DASLOG_INFO, file.toStringz(), line, "%s", format(args).toStringz());
 }
 
 void warnf(string file=__FILE__, size_t line=__LINE__, T...)(T args)
 {
-	daslog(DASLOG_WARN, file.toStringz(), line, format(args).toStringz());
+	daslog(DASLOG_WARN, file.toStringz(), line, "%s", format(args).toStringz());
 }
 
 void errorf(string file=__FILE__, size_t line=__LINE__, T...)(T args)
 {
-	daslog(DASLOG_ERROR, file.toStringz(), line, format(args).toStringz());
+	daslog(DASLOG_ERROR, file.toStringz(), line, "%s", format(args).toStringz());
 }
 
 void criticalf(string file=__FILE__, size_t line=__LINE__, T...)(T args)
 {
-	daslog(DASLOG_CRIT, file.toStringz(), line, format(args).toStringz());
+	daslog(DASLOG_CRIT, file.toStringz(), line, "%s", format(args).toStringz());
 }
 
 /+ Set the global das logging level.
