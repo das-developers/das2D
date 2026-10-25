@@ -154,7 +154,7 @@ struct DasTime{
 			dt.second = 0.0;
 			break;
 		default:
-			if(!dt_parsetime(s.toStringz(), &dt))
+			if(!dt_parsetime(&dt, s.toStringz()))
 				throw new ConvException(format("Error parsing %s as a date-time", s));
 			break;
 		}
@@ -186,7 +186,7 @@ struct DasTime{
 
 	string isoc(int fracdigits = 0) const{
 		char[64] aBuf = '\0';
-		dt_isoc(aBuf.ptr, 63, &dt, fracdigits);
+		dt_isoc(&dt, aBuf.ptr, 63, fracdigits);
 		return aBuf.idup[0..strlen(aBuf.ptr)];
 	}
 
@@ -242,13 +242,13 @@ struct DasTime{
 
 	string isod(int fracdigits) const{
 		char[64] aBuf = '\0';
-		dt_isod(aBuf.ptr, 63, &dt, fracdigits);
+		dt_isod(&dt, aBuf.ptr, 63, fracdigits);
 		return aBuf.idup[0..strlen(aBuf.ptr)];
 	}
 
 	string dual(int fracdigits) const{
 		char[64] aBuf = '\0';
-		dt_dual_str(aBuf.ptr, 63, &dt, fracdigits);
+		dt_dual_str(&dt, aBuf.ptr, 63, fracdigits);
 		return aBuf.idup[0..strlen(aBuf.ptr)];
 	}
 

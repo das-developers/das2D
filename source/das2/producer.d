@@ -140,18 +140,19 @@ enum ValueType {UNKNOWN, BOOL, DATETIME, INT, REAL, STRING };
 
 /* Standard Vector Component Directions ************************************ */
 
-static const string[4][] g_pStdDirs = [
+/* Same symbols and order as g_aSysSym in das2C's form_vec.c */
+static const string[3][] g_pStdDirs = [
 	
 	/* ALL of these are listed in a RIGHT HANDED order ! */
-	[ "x",  "y",  "z"], /* cartesian        */
-	[ "ρ",  "φ",  "z"], /* cylindrical      */
-	[ "r",  "θ",  "φ"], /* spherical        */
-	[ "r",  "φ",  "θ"], /* (planeto)centric */
-	[ "φ",  "θ",  "a"], /* (planeto)detic   */
-	[ "φ",  "θ",  "a"]  /* (planeto)graphic */
+	[ "x",  "y",  "z"], /* cartesian                         */
+	[ "ρ",  "φ",  "z"], /* cylindrical                       */
+	[ "r",  "θ",  "φ"], /* spherical, θ = colatitude         */
+	[ "r",  "λ",  "φ"], /* (planeto)centric, φ = latitude    */
+	[ "λ",  "φ",  "h"], /* (planeto)detic, λ east            */
+	[ "φ",  "λ",  "h"]  /* (planeto)graphic, λ WEST, so φ leads */
 ];
 
-// See also das_compsys_symbol() in vector.c of das2C
+// See also das_vsys_symbol() in form_vec.c of das2C
 string stdAxisSymbol(string sSystem, int iDir){
 
 	enforce( (iDir >= 0)&&(iDir < 3), format!"Invalid geometric axis index value: %d"(iDir));
@@ -161,7 +162,8 @@ string stdAxisSymbol(string sSystem, int iDir){
 	case "cylindrical": return g_pStdDirs[1][iDir];
 	case "spherical":   return g_pStdDirs[2][iDir];
 	case "centric":     return g_pStdDirs[3][iDir];
-	case "graphic":     return g_pStdDirs[4][iDir];
+	case "detic":       return g_pStdDirs[4][iDir];
+	case "graphic":     return g_pStdDirs[5][iDir];
 	default:
 		break;
 	}
@@ -258,14 +260,6 @@ bool getRdrOpts(StreamFmt SF, T...)(
 	catch(ConvException ex){
 		writeStreamHeader!SF();
 		writeException!SF(StreamExc.Query, ex.msg);
-
-		string sPkt = "<stream version=\"2.3/basic\"  />\n";
-		stdout.writef("|Hs||%d|%s", sPkt.length, sPkt);
-
-		string sExcept = "<exception type=\"QueryError\">\n"~"\n</exception>";
-		//encodeText(ex.msg) ~ "\n</exception>";
-		stdout.writef("|He||%d|%s", sPkt.length, sPkt);
-		
 		errorf("Error parsing command line, %s.\nUse -h for more help", ex.msg);
 		return false;
 	}
@@ -832,29 +826,35 @@ struct Property{
 		units = ("units" in jv) ? units = Units(jv["units"].str)   : UNIT_DIMENSIONLESS;
 	}
 
-	/++ The " sep=..." attribute for a das3 set property, else "".  Emitted only
-	 + for array types whose separator isn't the schema default (a space); the
-	 + non-printable separators are escaped, mirroring das2C. +/
-	private string _sepAttrV30(){
+	/++ The " term=..." attribute for a das3 set property, else "".  Emitted
+	 + only for array types whose terminator isn't a space; an absent term=
+	 + tells readers to split on whitespace runs.
+	 +
+	 + The v3.0 schema's Terminator type allows one printable ASCII byte other
+	 + than ( ) < > [ ] { } \ & " or one of the escapes \n \t \r \0.  Only \n
+	 + and \t are produced here: property values are XML text, which can't
+	 + hold a NUL and has every \r normalized to \n by the parser, so those two
+	 + terminators could never be honored.  Anything else is refused rather
+	 + than escaped, since no escaping makes it legal.
+	 +
+	 + Throws: ProdException if the terminator is outside the schema alphabet
+	 +/
+	private string _termAttrV30(){
 		bool bSet = (type == PropType.BOOL_ARY)||(type == PropType.DATETIME_ARY)
 		         || (type == PropType.INT_ARY) ||(type == PropType.REAL_ARY)
 		         || (type == PropType.STRING_ARY);
 		if(!bSet || (sep.length == 0) || (sep == " ")) return "";
-		string sEsc;
-		switch(sep[0]){
-		case '\n': sEsc = "\\n";  break;
-		case '\t': sEsc = "\\t";  break;
-		case '\r': sEsc = "\\r";  break;
-		case '\\': sEsc = "\\\\"; break;
-		// XML-special printables: the value is double-quoted, so escape & " < >
-		// (a bare apostrophe is fine inside double quotes).
-		case '&':  sEsc = "&amp;";  break;
-		case '"':  sEsc = "&quot;"; break;
-		case '<':  sEsc = "&lt;";   break;
-		case '>':  sEsc = "&gt;";   break;
-		default:   sEsc = sep[0..1]; break;
-		}
-		return format!" sep=\"%s\""(sEsc);
+		// das3 v3.0 <p term> is an ALLOW-list of single printable bytes (XSD type
+		// Terminator): ! # $ % ' * / ; = ? @ ^ _ ` ~ with no escapes.  \n and \t
+		// are not legal here (\n is idxTerm-only), nor is '|' or ','.  Absent term
+		// means split on whitespace, handled by the early return above.
+		char c = sep[0];
+		if(indexOf("!#$%'*/;=?@^_`~", c) < 0)
+			throw new ProdException(StreamExc.Server, format!(
+				"Property '%s': byte 0x%02X ('%s') is not a legal das3 property "~
+				"terminator, use one of ! # $ %% ' * / ; = ? @ ^ _ ` ~"
+			)(name, c, (c >= ' ' && c <= '~') ? sep[0..1] : "?"));
+		return format!" term=\"%s\""(sep[0..1]);
 	}
 
 	/++ Calls .toString() and uses encodeText on the result +/
@@ -867,16 +867,16 @@ struct Property{
 			string sType = type.toString();
  			string sEncVal = toUTF8(encodeText(value).array);
  			string sName = sAxis.length > 0 ?  sAxis ~ name[0..1].toUpper() ~ name[1..$] : name;
- 			string sSep = _sepAttrV30();
+ 			string sTerm = _termAttrV30();
 
  			if(sType != "string"){
  				if(units != UNIT_DIMENSIONLESS)
  					return format!"<p type=\"%s\" name=\"%s\" units=\"%s\"%s>%s</p>"(
- 						sType, sName, units.toString(), sSep, sEncVal
+ 						sType, sName, units.toString(), sTerm, sEncVal
  					);
  				else
  					return format!"<p type=\"%s\" name=\"%s\"%s>%s</p>"(
- 						sType, sName, sSep, sEncVal
+ 						sType, sName, sTerm, sEncVal
  					);
  			}
  			else{
@@ -885,7 +885,7 @@ struct Property{
  						sName, units.toString(), sEncVal
  					);
  				else
- 					return format!"<p name=\"%s\">%s</p>"(name, sEncVal);
+ 					return format!"<p name=\"%s\">%s</p>"(sName, sEncVal);
  			}
 		}
 	}
@@ -910,22 +910,10 @@ struct Property{
 		
 		string sName = sAxis.length > 0 ? sAxis ~ name[0..1].toUpper() ~ name[1..$] : name;
 
+		// One v3.0 property writer: toXmlStr escapes the value and emits the
+		// real terminator.
 		static if(SF == StreamFmt.v30){
- 			sType = type.toString();
- 			if(sType == "string") sType = "";
- 			else sType = format!"type=\"%s\" "(sType);
-
- 			string sUnits = "";
- 			if(units != UNIT_DIMENSIONLESS)
- 				sUnits = format!" units=\"%s\""(units.toString());
-
- 			string sSep = "";
- 			if((type == PropType.BOOL_ARY)||(type == PropType.STRING_ARY)||
- 				(type == PropType.DATETIME_ARY)||(type == PropType.REAL_ARY)||
- 				(type == PropType.INT_ARY))
- 				sSep = format!("sep=\";\"");
-
- 			return format!"<p %sname=\"%s\"%s>%s</p>"(sType, sName, sSep, value);
+			return toXmlStr!SF(sAxis);
  		}
  		else{
  			switch(type){
@@ -982,31 +970,41 @@ unittest{
 }
 
 unittest{
-	// das3 set properties emit their separator only when it isn't the schema
-	// default (a space); single/whitespace-separated props carry no sep=.
+	// das3 set properties emit their terminator only when it isn't a space;
+	// single/whitespace-separated props carry no term=.
 	import std.algorithm.searching: canFind;
+	import std.exception: assertThrown;
 
 	string sSemi = Property("labels", ["Bx","By","Bz"], ";").toXmlStr!(StreamFmt.v30)();
 	assert(sSemi.canFind(`type="stringArray"`), sSemi);
-	assert(sSemi.canFind(`sep=";"`), sSemi);
+	assert(sSemi.canFind(`term=";"`), sSemi);
+	assert(!sSemi.canFind("sep="), sSemi);
 
-	// newline separator escapes to the two-char \n on the wire
-	string sNl = Property("notes", ["a","b"], "\n").toXmlStr!(StreamFmt.v30)();
-	assert(sNl.canFind(`sep="\n"`), sNl);
+	// every byte of the v3.0 Terminator allow-list goes out verbatim
+	foreach(c; "!#$%'*/;=?@^_`~"){
+		string sOk = Property("ok", ["a","b"], [c].idup).toXmlStr!(StreamFmt.v30)();
+		assert(sOk.canFind(format!`term="%c"`(c)), sOk);
+	}
 
-	// default space separator -> omitted
+	// default space terminator -> omitted
 	string sSpace = Property("words", ["a","b"], " ").toXmlStr!(StreamFmt.v30)();
-	assert(!sSpace.canFind("sep="), sSpace);
+	assert(!sSpace.canFind("term="), sSpace);
 
-	// single string is never a set -> no sep
-	assert(!Property("note", "hello").toXmlStr!(StreamFmt.v30)().canFind("sep="));
+	// single string is never a set -> no term
+	assert(!Property("note", "hello").toXmlStr!(StreamFmt.v30)().canFind("term="));
 
-	// XML-special separators must be entity-escaped in the attribute (the value
-	// is double-quoted, so & " < > all need escaping).
-	assert(Property("u", ["a","b"], "&").toXmlStr!(StreamFmt.v30)().canFind(`sep="&amp;"`));
-	assert(Property("u", ["a","b"], `"`).toXmlStr!(StreamFmt.v30)().canFind(`sep="&quot;"`));
-	assert(Property("u", ["a","b"], "<").toXmlStr!(StreamFmt.v30)().canFind(`sep="&lt;"`));
-	assert(Property("u", ["a","b"], ">").toXmlStr!(StreamFmt.v30)().canFind(`sep="&gt;"`));
+	// Bytes outside the schema's Terminator alphabet are refused, not escaped.
+	// \n is idxTerm-only, '|' is the packet tag separator, ',' the idxTerm list
+	// separator; das2C 948724b dropped all three from <p term>.
+	foreach(s; ["&", `"`, "<", ">", "(", ")", "[", "]", "{", "}", `\`, "\x01", "\x7f",
+	            "\r", "\0", "\n", "\t", "|", ",", ":", "a", "0", "+", "-", "."])
+		assertThrown!ProdException(Property("u", ["a","b"], s).toXmlStr!(StreamFmt.v30)());
+
+	// The stream header path (toString) shares the one v3.0 writer, so values
+	// are XML-escaped and the real terminator is used.
+	string sHdr = Property("labels", ["a&b","c"], "@").toString!(StreamFmt.v30)();
+	assert(sHdr.canFind(`term="@"`), sHdr);
+	assert(sHdr.canFind("a&amp;b"), sHdr);
 }
 
 unittest{
@@ -1038,45 +1036,11 @@ unittest{
 	assert(cast(string) pWide.bytes() == "|Pd|2|3|B\u03b8", cast(string) pWide.bytes());
 }
 
-/* Frame Definitions ******************************************************* */
-
-struct Frame {
-	Property[] props;
-	string name;
-	string body;
-	bool fixed;  // If true, the frame is afixed to the body and rotates with it
-
-	this(string sName, string sBody = "", bool bFixed = false, Property[] pProps = []){
-		name = sName;
-		body = sBody;
-		fixed = bFixed;
-		props = pProps;
-	}
-
-	string toString(StreamFmt SF)(string sIndent = "  ")
-	{
-		char[] pOut;
-		pOut.reserve = 256;
-		string sBody = "";
-		if(body.length > 0)
-			sBody = format!" body=\"%s\""(body);
-		string sFixed = "";
-		if(fixed) sFixed = " fixed=\"true\"";
-		
-		pOut ~= format!"%s<frame name=\"%s\"%s%s>\n"(sIndent, name, sBody, sFixed);
-
-		if(props.length > 0){
-			pOut ~= "    <properties>\n      ".r;
-			pOut ~= props.map!( prop => prop.toString!SF()).join("\n      ").r;
-			pOut ~= "\n    </properties>\n".r;
-		}
-
-		pOut ~= format!("%s</frame>\n")(sIndent);
-		return cast(string) pOut;
-	}
-};
-
 /* Writing Stream Headers ************************************************** */
+
+/* There is no <frame> element in das3.0 streams.  Frames are not registered
+   at the stream level, instead each vector variable names its frame in an
+   <ops kind="vector" frame="..."/> element, see das2C/schema/das2c_operations.md */
 
 private ubyte[] _propEncode(StreamFmt SF)(auto ref Property[] pProp)
 {
@@ -1091,7 +1055,7 @@ private ubyte[] _propEncode(StreamFmt SF)(auto ref Property[] pProp)
 }
 
 void writeStreamHeader(StreamFmt SF)(
-	ref Appender!(ubyte[]) buf, auto ref Property[] pProp, auto ref Frame[] pFrame
+	ref Appender!(ubyte[]) buf, auto ref Property[] pProp
 ){
 	
    char[48] aTag;  // Tags are small, use static buffer
@@ -1106,8 +1070,6 @@ void writeStreamHeader(StreamFmt SF)(
 			pPkt ~= _propEncode!SF(pProp);
 			pPkt ~= "\n  </properties>\n".r;
 		}
-		foreach(ref frame; pFrame)
-			pPkt ~= frame.toString!SF();
 		pPkt ~= "</stream>\n".r;
 
 		pTag = sformat!"|Sx||%d|"(aTag[], pPkt.length);
@@ -1116,11 +1078,6 @@ void writeStreamHeader(StreamFmt SF)(
 		pPkt ~= "<stream version=\"2.2\" >\n  <properties\n    ".r;
 		pPkt ~= _propEncode!SF(pProp);
 		pPkt ~= "\n  />\n";
-		/* Hey man, no frames in das2.2...
-		foreach(ref frame; pFrame)
-			pPkt ~= frame.toString!SF();
-		*/
-		
 		pPkt ~= "</stream>\n".r;
 
 		pTag = sformat!"[00]%06d"(aTag[], pPkt.length);
@@ -1134,16 +1091,7 @@ void writeStreamHeader(StreamFmt SF)(
 void writeStreamHeader(StreamFmt SF)(auto ref Property[] pProp)
 {
 	Appender!(ubyte[]) buf;  // Heap based output buffer
-	writeStreamHeader!SF(buf, pProp, []);
-
-	stdout.rawWrite(buf[]);
-	stdout.flush();
-}
-
-void writeStreamHeader(StreamFmt SF)(auto ref Property[] pProp, ref Frame[] pFrame)
-{
-	Appender!(ubyte[]) buf;  // Heap based output buffer
-	writeStreamHeader!SF(buf, pProp, pFrame);
+	writeStreamHeader!SF(buf, pProp);
 
 	stdout.rawWrite(buf[]);
 	stdout.flush();

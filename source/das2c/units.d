@@ -22,6 +22,7 @@
 module das2c.units;
 
 import core.stdc.time;
+import das2c.defs: DasErrCode;
 import das2c.time;
 
 extern (C):
@@ -166,7 +167,7 @@ const(char)* Units_toStr (das_units unit);
  *         or if the name contains a trailing '_' or there was more than one
  *         '_' characters in a unit name.
  */
-char* Units_toLabel (das_units unit, char* sBuf, int nLen);
+char* Units_toLabel (das_units unit, char* sBuf, size_t uLen);
 
 /** Invert the units, most commonly used for Fourier transform results
  *
@@ -346,7 +347,7 @@ bool Units_haveCalRep (das_units unit);
 
  * @param[in] epoch_units Unit string
  */
-void Units_convertToDt (das_time* pDt, double value, das_units epoch_units);
+DasErrCode Units_convertToDt (das_time* pDt, double value, das_units epoch_units);
 
 /** Convert a calendar representation of a time to value in time offset units
  *

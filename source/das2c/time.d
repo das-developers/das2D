@@ -81,7 +81,7 @@ void dt_null (das_time* pDt);
  *
  * @memberof das_time
  */
-bool dt_parsetime (const(char)* string, das_time* dt);
+bool dt_parsetime (das_time* pDt, const(char)* sTime);
 
 /** Initialize a das_time to the current UTC time.
  *
@@ -93,7 +93,7 @@ bool dt_now (das_time* pDt);
  * day.  This format is common for many older spacecraft missions
  * @memberof das_time
  */
-void dt_from_1958 (ushort daysSince1958, uint msOfDay, das_time* dt);
+void dt_from_1958 (das_time* pDt, ushort daysSince1958, uint msOfDay);
 
 /** Convert a das time to integer nanoseconds since 1970-01-01
  *
@@ -191,7 +191,7 @@ double dt_diff (const(das_time)* pA, const(das_time)* pB);
  *        must be a number from 0 to 15 inclusive
  * @memberof das_time
  */
-char* dt_isoc (char* sBuf, size_t nLen, const(das_time)* pDt, int nFracSec);
+char* dt_isoc (const(das_time)* pDt, char* sBuf, size_t uLen, int nFracSec);
 
 /** Print an ISOD standard time string given a das_time structure
  *
@@ -209,7 +209,7 @@ char* dt_isoc (char* sBuf, size_t nLen, const(das_time)* pDt, int nFracSec);
  *        must be a number from 0 to 15 inclusive
  * @memberof das_time
  */
-char* dt_isod (char* sBuf, size_t nLen, const(das_time)* pDt, int nFracSec);
+char* dt_isod (const(das_time)* pDt, char* sBuf, size_t uLen, int nFracSec);
 
 /** Print time a string that provides both day of month and day of year given a
  *  das_time structure
@@ -228,7 +228,7 @@ char* dt_isod (char* sBuf, size_t nLen, const(das_time)* pDt, int nFracSec);
  *        must be a number from 0 to 15 inclusive
  * @memberof das_time
  */
-char* dt_dual_str (char* sBuf, size_t nLen, const(das_time)* pDt, int nFracSec);
+char* dt_dual_str (const(das_time)* pDt, char* sBuf, size_t uLen, int nFracSec);
 
 /* Julian Day at January 1, 1958, 12:00:00 UT */
 enum EPOCH = 2436205;
@@ -258,7 +258,7 @@ double dt_ttime (const(das_time)* dt);
  * beginning of 1958, ignoring leap seconds) to date and time components.
  * @memberof das_time
  */
-void dt_emitt (double tt, das_time* dt);
+void dt_emitt (das_time* pDt, double tt);
 
 /** Convert a time structure to a TT2000 time 
  * 
